@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Copyright (c) 2019 Genome Research Limited
 
@@ -18,10 +17,6 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-import sys
-
-from cli import main
-
-
-if __name__ == "__main__":
-    main(*sys.argv[1:])
+def main(*args:str) -> None:
+    """ CLI entrypoint """
+    raise NotImplementedError("Oh dear...")
