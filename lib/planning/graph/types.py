@@ -22,14 +22,14 @@ from abc import ABCMeta, abstractmethod
 from common import types as T
 
 
-class Vertex(ABCMeta):
+class Vertex(metaclass=ABCMeta):
     """ Vertex abstract base class """
 
 
-class Edge(ABCMeta):
+class Edge(metaclass=ABCMeta):
     """ Edge abstract base class """
     _cost:T.Number
 
 
-class Graph(ABCMeta):
+class Graph(metaclass=ABCMeta):
     """ Graph abstract base class """
