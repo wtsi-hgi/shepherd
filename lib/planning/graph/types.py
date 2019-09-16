@@ -104,6 +104,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
         """ Does the graph contain a given vertex? """
         # NOTE We openly flaunt the interface of typing.Container, as
         # we're more interested in the vertices, rather than the edges
+        # FIXME Make this O(1), rather than O(n)
         return any(needle in haystack for haystack in self._edges)
 
     def __iadd__(self, edge:Edge) -> Graph:
@@ -121,6 +122,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
 
     def neighbours(self, vertex:Vertex) -> T.Iterable[Edge]:
         """ Return all immediate neighbours, by edge, of a vertex """
+        # NOTE This is more like a list of valid routes to/from a vertex
         if vertex not in self:
             raise VertexNotInGraph(f"Vertex {vertex} is not in Graph {self}")
 
@@ -129,4 +131,6 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
                 yield needle
 
             elif not needle.is_directed and vertex is needle.b:
+                # The edge is important to us, so we return it
+                # unchanged, rather than reversing its vertices
                 yield needle
