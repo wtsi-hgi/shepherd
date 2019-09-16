@@ -121,7 +121,12 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
         return union
 
     def neighbours(self, vertex:Vertex) -> T.Iterable[Edge]:
-        """ Return all immediate neighbours, by edge, of a vertex """
+        """
+        Return all immediate neighbours, by edge, of a vertex
+
+        @param   vertex  Starting vertex
+        @return  Generator of valid neighbouring edges
+        """
         # NOTE This is more like a list of valid routes to/from a vertex
         if vertex not in self:
             raise VertexNotInGraph(f"Vertex {vertex} is not in Graph {self}")
@@ -134,3 +139,20 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
                 # The edge is important to us, so we return it
                 # unchanged, rather than reversing its vertices
                 yield needle
+
+    def route(self, a:Vertex, b:Vertex, *, via:T.Optional[T.List[Vertex]] = None) -> Graph:
+        """
+        Find the shortest path between two vertices, through an optional
+        list of waypoints, if it exists
+
+        @param   start   Starting vertex
+        @param   finish  Finishing vertex
+        @param   via     Ordered list of waypoints
+        @return  Shortest path
+        """
+        for vertex in [a, b, *(via or [])]:
+            if not vertex in self:
+                raise VertexNotInGraph(f"Vertex {vertex} is not in Graph {self}")
+
+        # TODO
+        raise NotImplementedError("Oh dear...")
