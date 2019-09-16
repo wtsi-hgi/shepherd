@@ -24,3 +24,20 @@ from pathlib import *
 
 from .time import datetime as DateTime, \
                   timedelta as TimeDelta
+
+
+_T = TypeVar("_T")
+
+class Carrier(Generic[_T]):
+    """ Generic carrier type """
+    # NOTE While this is a container, in the semantic sense, it is
+    # different to Python's notion of a container (per typing.Container)
+    _payload:_T
+
+    @property
+    def payload(self) -> _T:
+        return self._payload
+
+    @payload.setter
+    def payload(self, value:_T) -> None:
+        self._payload = value

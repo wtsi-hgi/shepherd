@@ -34,28 +34,11 @@ class NoRouteFound(BaseException):
     """ Raised when no route can be found matching the itinerary """
 
 
-_T = T.TypeVar("_T")
-
-class _Carrier(T.Generic[_T], metaclass=ABCMeta):
-    """ Generic carrier abstract base class """
-    # NOTE While this is a container, in the semantic sense, it is
-    # different to Python's notion of a container (per typing.Container)
-    _payload:_T
-
-    @property
-    def payload(self) -> _T:
-        return self._payload
-
-    @payload.setter
-    def payload(self, value:_T) -> None:
-        self._payload = value
-
-
-class Vertex(_Carrier[T.Any], metaclass=ABCMeta):
+class Vertex(T.Carrier[T.Any], metaclass=ABCMeta):
     """ Vertex abstract base class """
 
 
-class Edge(_Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
+class Edge(T.Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
     """ Edge abstract base class """
     _vertices:T.Tuple[Vertex, Vertex]
     _directed:bool
