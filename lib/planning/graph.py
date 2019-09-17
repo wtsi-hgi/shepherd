@@ -159,9 +159,8 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
         @param   via     Ordered list of waypoints
         @return  Shortest path
         """
-        for vertex in [a, b, *(via or [])]:
-            if not vertex in self:
-                raise VertexNotInGraph(f"Vertex {vertex} is not in Graph {self}")
+        if any(vertex not in self for vertex in [a, b, *(via or [])]):
+            raise VertexNotInGraph(f"Graph {self} does not contain all required waypoints")
 
         # TODO
         raise NotImplementedError("Oh dear...")
