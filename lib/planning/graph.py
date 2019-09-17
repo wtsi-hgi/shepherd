@@ -97,6 +97,10 @@ class Edge(T.Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
         self._cost = value
 
 
+# Convenience type (rather than a full Graph): An ordered list of edges,
+# where juxtaposed vertices correspond (i.e., a contiguous route)
+Route = T.List[Edge]
+
 class Graph(T.Container[Edge], metaclass=ABCMeta):
     """ Graph abstract base class """
     # NOTE Our graph is a container of edges; contrary to definition, we
@@ -149,11 +153,11 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
                 # unchanged, rather than reversing its vertices
                 yield needle
 
-    def _shortest_path(self, a:Vertex, b:Vertex) -> Graph:
+    def _shortest_path(self, a:Vertex, b:Vertex) -> Route:
         """ Shortest path between two vertices """
         raise NotImplementedError("Oh dear...")
 
-    def route(self, *waypoints:Vertex) -> Graph:
+    def route(self, *waypoints:Vertex) -> Route:
         """
         Find the shortest path through an ordered list of waypoints, if
         it exists
@@ -167,10 +171,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
         if any(vertex not in self for vertex in waypoints):
             raise VertexNotInGraph(f"Graph {self} does not contain all required waypoints")
 
-        route = self.__class__()
-
-        # Union the shortest paths between pairwise waypoints
-        for terminals in zip(waypoints, waypoints[1:]):
-            route = route + self._shortest_path(*terminals)
-
-        return route
+        # Concatenation of shortest paths between pairwise waypoints
+        return sum((
+            self._shortest_path(*terminals)
+            for terminals in zip(waypoints, waypoints[1:])), [])
