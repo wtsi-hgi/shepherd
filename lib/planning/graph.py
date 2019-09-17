@@ -149,18 +149,28 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
                 # unchanged, rather than reversing its vertices
                 yield needle
 
-    def route(self, a:Vertex, b:Vertex, *, via:T.Optional[T.List[Vertex]] = None) -> Graph:
-        """
-        Find the shortest path between two vertices, through an optional
-        list of waypoints, if it exists
+    def _shortest_path(self, a:Vertex, b:Vertex) -> Graph:
+        """ Shortest path between two vertices """
+        raise NotImplementedError("Oh dear...")
 
-        @param   start   Starting vertex
-        @param   finish  Finishing vertex
-        @param   via     Ordered list of waypoints
+    def route(self, *waypoints:Vertex) -> Graph:
+        """
+        Find the shortest path through an ordered list of waypoints, if
+        it exists
+
+        @param   via  Waypoint vertices (at least 2)
         @return  Shortest path
         """
-        if any(vertex not in self for vertex in [a, b, *(via or [])]):
+        if len(waypoints) < 2:
+            raise NoRouteFound(f"Cannot route between {len(waypoints)} vertices")
+
+        if any(vertex not in self for vertex in waypoints):
             raise VertexNotInGraph(f"Graph {self} does not contain all required waypoints")
 
-        # TODO
-        raise NotImplementedError("Oh dear...")
+        route = self.__class__()
+
+        # Union the shortest paths between pairwise waypoints
+        for terminals in zip(waypoints, waypoints[1:]):
+            route = route + self._shortest_path(*terminals)
+
+        return route
