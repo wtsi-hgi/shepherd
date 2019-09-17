@@ -21,8 +21,9 @@ with this program. If not, see https://www.gnu.org/licenses/
 # https://docs.python.org/3/whatsnew/3.7.html#pep-563-postponed-evaluation-of-annotations
 from __future__ import annotations
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from copy import copy
+from functools import total_ordering
 
 from common import types as T
 
@@ -38,11 +39,33 @@ class Vertex(T.Carrier[T.Any], metaclass=ABCMeta):
     """ Vertex abstract base class """
 
 
+@total_ordering
+class Cost(T.Carrier[T.Number], metaclass=ABCMeta):
+    """ Edge cost abstract base class """
+    def __init__(self, cost:T.Number) -> None:
+        self.payload = cost
+
+    def __eq__(self, rhs:Cost) -> bool:
+        return self.payload == rhs.payload
+
+    def __lt__(self, rhs:Cost) -> bool:
+        return self.payload < rhs.payload
+
+    @abstractmethod
+    def __add__(self, rhs:Cost) -> Cost:
+        """ Define how edge costs should be summed """
+
+    @property
+    def value(self) -> T.Number:
+        """ Convenience alias """
+        return self.payload
+
+
 class Edge(T.Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
     """ Edge abstract base class """
     _vertices:T.Tuple[Vertex, Vertex]
     _directed:bool
-    _cost:T.Number
+    _cost:Cost
 
     def __init__(self, a:Vertex, b:Vertex, *, directed:bool = False) -> None:
         self._vertices = (a, b)
@@ -66,11 +89,11 @@ class Edge(T.Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
         return self._directed
 
     @property
-    def cost(self) -> T.Number:
+    def cost(self) -> Cost:
         return self._cost
 
     @cost.setter
-    def cost(self, value:T.Number) -> None:
+    def cost(self, value:Cost) -> None:
         self._cost = value
 
 
