@@ -162,7 +162,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
         Find the shortest path through an ordered list of waypoints, if
         it exists
 
-        @param   via  Waypoint vertices (at least 2)
+        @param   waypoints  Waypoint vertices (at least 2)
         @return  Shortest path
         """
         if len(waypoints) < 2:
