@@ -102,20 +102,23 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
     # NOTE Our graph is a container of edges; contrary to definition, we
     # do not consider unconnected vertices to be in the graph
     _edges:T.List[Edge]
+    _atlas:T.Dict[Vertex, None]
 
     def __init__(self) -> None:
         self._edges = []
+        self._atlas = {}
 
     def __contains__(self, needle:Vertex) -> bool:
         """ Does the graph contain a given vertex? """
         # NOTE We openly flaunt the interface of typing.Container, as
         # we're more interested in the vertices, rather than the edges
-        # FIXME Make this O(1), rather than O(n)
-        return any(needle in haystack for haystack in self._edges)
+        return needle in self._atlas
 
     def __iadd__(self, edge:Edge) -> Graph:
         """ Add an edge to a graph """
         self._edges.append(edge)
+        self._atlas[edge.a] = None
+        self._atlas[edge.b] = None
         return self
 
     def __add__(self, graph:Graph) -> Graph:
