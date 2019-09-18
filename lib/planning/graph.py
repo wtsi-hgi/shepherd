@@ -132,6 +132,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
 
     def __add__(self, graph:Graph) -> Graph:
         """ Return the union of two graphs """
+        # TODO This is probably not going to be needed...
         union = copy(graph)
         for edge in self._edges:
             union += edge
