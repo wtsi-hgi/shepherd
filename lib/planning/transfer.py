@@ -30,3 +30,8 @@ class PolynomialComplexity(Cost):
     # NOTE The k in O(n^k)
     def __add__(self, rhs:PolynomialComplexity) -> PolynomialComplexity:
         return max(self, rhs)
+
+# Some useful constants
+O1  = PolynomialComplexity(0)  # Constant time
+On  = PolynomialComplexity(1)  # Linear time
+On2 = PolynomialComplexity(2)  # Quadratic time
