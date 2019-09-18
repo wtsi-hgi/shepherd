@@ -28,6 +28,11 @@ from functools import total_ordering
 from common import types as T
 
 
+# FIXME Some (all?) of these types need to be declared as co- or
+# contravariant to correctly type check. I'm still unsure which and how,
+# but it doesn't affect functionality, only static analysis.
+
+
 class VertexNotInGraph(BaseException):
     """ Raised when a vertex does not exist in the given graph """
 
