@@ -20,17 +20,11 @@ with this program. If not, see https://www.gnu.org/licenses/
 import os
 
 from common import types as T
-from common.templating import Jinja2Templating
+from common.templating import Filter
 
 
-_filters:T.Dict[str, T.Callable[..., str]] = {
+filters:T.Dict[str, Filter] = {
     "dirname":  os.path.dirname,
     "basename": os.path.basename
     # TODO Any other useful filters...
 }
-
-
-templating = Jinja2Templating()
-
-for name, fn in _filters.items():
-    templating.add_filter(name, fn)

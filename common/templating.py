@@ -28,6 +28,10 @@ class TemplatingError(BaseException):
     """ Raised on generic templating errors """
 
 
+# Filter type MUST have at least one string argument
+Filter = T.Callable[..., str]
+
+
 class Templating(metaclass=ABCMeta):
     """
     Templating engine base class
@@ -42,7 +46,7 @@ class Templating(metaclass=ABCMeta):
         """ Add a string template to the templating engine """
 
     @abstractmethod
-    def add_filter(self, name:str, fn:T.Callable[..., str]) -> None:
+    def add_filter(self, name:str, fn:Filter) -> None:
         """ Add a filter to the templating engine """
 
     @abstractmethod
@@ -70,3 +74,25 @@ class Jinja2Templating(Templating):
             raise TemplatingError(f"No such template {template}")
 
         return self._templates[template].render(**tags)
+
+
+def templating_factory(cls:T.Type[Templating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None) -> Templating:
+    """
+    Create Templating engine with given filters and templates
+
+    @param   cls        Templating engine to instantiate
+    @param   filters    Dictionary of filters (optional)
+    @param   templates  Dictionary of templates (optional)
+    @return  Templating engine
+    """
+    templating = cls()
+
+    if filters is not None:
+        for name, fn in filters.items():
+            templating.add_filter(name, fn)
+
+    if templates is not None:
+        for name, template in templates.items():
+            templating.add_template(name, template)
+
+    return templating
