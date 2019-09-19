@@ -46,7 +46,12 @@ class Vertex(T.Carrier[T.Any], metaclass=ABCMeta):
 
 @total_ordering
 class Cost(T.Carrier[T.Number], metaclass=ABCMeta):
-    """ Edge cost abstract base class """
+    """
+    Edge cost abstract base class
+
+    Implementations required:
+    * __add__ :: Cost -> Cost
+    """
     def __init__(self, cost:T.Number) -> None:
         self.payload = cost
 

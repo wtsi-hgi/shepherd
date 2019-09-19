@@ -29,7 +29,14 @@ class TemplatingError(BaseException):
 
 
 class Templating(metaclass=ABCMeta):
-    """ Templating engine base class """
+    """
+    Templating engine base class
+
+    Implementations required:
+    * add_template :: str x str -> None
+    * add_filter   :: str x Function -> None
+    * render       :: str x kwargs -> str
+    """
     @abstractmethod
     def add_template(self, name:str, template:str) -> None:
         """ Add a string template to the templating engine """
