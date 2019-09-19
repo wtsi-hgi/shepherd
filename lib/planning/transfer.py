@@ -24,12 +24,16 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 
 from common import types as T
+from common.execptions import NOT_IMPLEMENTED
 from common.templating import Templating
 from .graph import Vertex, Cost, CostBearing, Edge, Graph
 
 
 class UnsupportedByFilesystem(BaseException):
     """ Raised when an unsupported action is attempted on a filesystem """
+
+class DataInaccessible(BaseException):
+    """ Raised when data cannot be accessed for whatever reason """
 
 
 class PolynomialComplexity(Cost):
@@ -71,6 +75,8 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         @param   data  File to check
         @return  Predicate
         """
+        # FIXME It's better to ask forgiveness than to seek permission;
+        # the model as described here is susceptible to security holes
 
     @abstractmethod
     def _identify_by_metadata(self, **metadata:str) -> T.Iterable[T.Path]:
@@ -112,7 +118,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # TODO Design and implement query language that ultimately calls
         # the appropriate "_identify_by_*" method(s) and combines their
         # results accordingly
-        raise NotImplementedError("Oh dear...")
+        raise NOT_IMPLEMENTED
 
     @property
     @abstractmethod
@@ -137,6 +143,9 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         """
         if algorithm not in self.supported_checksums:
             raise UnsupportedByFilesystem(f"Filesystem does not support the {algorithm} checksum algorithm")
+
+        if not self._accessible(data):
+            raise DataInaccessible(f"Cannot access {data}")
 
         return self._checksum(algorithm, data)
 

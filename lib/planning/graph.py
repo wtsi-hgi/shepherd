@@ -26,6 +26,7 @@ from copy import copy
 from functools import total_ordering
 
 from common import types as T
+from common.exceptions import NOT_IMPLEMENTED
 
 
 # FIXME Some (all?) of these types need to be declared as co- or
@@ -170,7 +171,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
 
     def _shortest_path(self, a:Vertex, b:Vertex) -> Route:
         """ Shortest path between two vertices """
-        raise NotImplementedError("Oh dear...")
+        raise NOT_IMPLEMENTED
 
     def route(self, *waypoints:Vertex) -> Route:
         """

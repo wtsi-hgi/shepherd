@@ -17,9 +17,4 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from common.exceptions import NOT_IMPLEMENTED
-
-
-def main(*args:str) -> None:
-    """ CLI entrypoint """
-    raise NOT_IMPLEMENTED
+NOT_IMPLEMENTED = NotImplementedError("Oh dear...")
