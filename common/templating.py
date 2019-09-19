@@ -37,10 +37,22 @@ class Templating(metaclass=ABCMeta):
     Templating engine base class
 
     Implementations required:
+    * templates    :: () -> List[str]
+    * filters      :: () -> List[str]
     * add_template :: str x str -> None
     * add_filter   :: str x Function -> None
     * render       :: str x kwargs -> str
     """
+    @property
+    @abstractmethod
+    def templates(self) -> T.List[str]:
+        """ List of available templates """
+
+    @property
+    @abstractmethod
+    def filters(self) -> T.List[str]:
+        """ List of available filters """
+
     @abstractmethod
     def add_template(self, name:str, template:str) -> None:
         """ Add a string template to the templating engine """
@@ -63,10 +75,18 @@ class Jinja2Templating(Templating):
         self._env = Environment()
         self._templates = {}
 
+    @property
+    def templates(self) -> T.List[str]:
+        return list(self._templates.keys())
+
+    @property
+    def filters(self) -> T.List[str]:
+        return list(self._env.filters.keys())
+
     def add_template(self, name:str, template:str) -> None:
         self._templates[name] = self._env.from_string(template)
 
-    def add_filter(self, name:str, fn:T.Callable[..., str]) -> None:
+    def add_filter(self, name:str, fn:Filter) -> None:
         self._env.filters[name] = fn
 
     def render(self, template:str, **tags:T.Any) -> str:
