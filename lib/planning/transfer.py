@@ -24,6 +24,8 @@ from __future__ import annotations
 from .graph import Vertex, Cost, Edge, Graph, \
                    VertexNotInGraph, NoRouteFound
 
+from .templating import templating
+
 
 class PolynomialComplexity(Cost):
     """ Edge cost representing polynomial time complexity """

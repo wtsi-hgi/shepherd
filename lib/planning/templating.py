@@ -17,12 +17,16 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+import os
+
 from common import types as T
 from common.templating import Jinja2Templating
 
 
-_filters = {
-    # TODO Filepath manipulation filters (e.g., basename, etc.)
+_filters:T.Dict[str, T.Callable[..., str]] = {
+    "dirname":  os.path.dirname,
+    "basename": os.path.basename
+    # TODO Any other useful filters...
 }
 
 
