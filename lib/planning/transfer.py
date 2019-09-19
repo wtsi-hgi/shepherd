@@ -114,8 +114,8 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # results accordingly
         raise NotImplementedError("Oh dear...")
 
-    @abstractmethod
     @property
+    @abstractmethod
     def supported_checksums(self) -> T.List[str]:
         """
         Checksums algorithms supported by the filesystem
@@ -163,3 +163,24 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
 class RouteTransformation(CostBearing, metaclass=ABCMeta):
     """ Route transformation abstract base class """
     # TODO Think about how this is meant to work...
+
+
+class TransferRoute(Edge):
+    """ Data transfer route """
+    _templating:Templating
+
+    def __init__(self, *, templating:Templating, cost:PolynomialComplexity = On) -> None:
+        # TODO Subclass this
+        assert "transfer" in templating.templates
+        self._templating = templating
+
+        self.payload:T.List[RouteTransformation] = []
+        self.cost = cost
+
+    def __iadd__(self, transform:RouteTransformation) -> TransferRoute:
+        """ Add a transformation to the route """
+        self._payload.append(transform)
+        self.cost += transform.cost
+        return self
+
+    # TODO This needs more thought...
