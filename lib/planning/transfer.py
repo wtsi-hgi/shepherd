@@ -24,7 +24,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 
 from common import types as T
-from common.execptions import NOT_IMPLEMENTED
+from common.exceptions import NOT_IMPLEMENTED
 from common.templating import Templating
 from .graph import Vertex, Cost, CostBearing, Edge, Graph
 
