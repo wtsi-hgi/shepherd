@@ -24,9 +24,8 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 
 from common import types as T
-from .graph import Vertex, Cost, Edge, Graph, \
-                   VertexNotInGraph, NoRouteFound
-from .templating import templating
+from common.templating import Templating
+from .graph import Vertex, Cost, CostBearing, Edge, Graph
 
 
 class UnsupportedByFilesystem(BaseException):
@@ -61,6 +60,8 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     """
     # TODO/FIXME We are using Path throughout. It would probably be more
     # appropriate/general to use something like URI
+    # NOTE A Vertex is a Carrier; there's probably something useful that
+    # we can put in its payload...
 
     @abstractmethod
     def _accessible(self, data:T.Path) -> bool:
@@ -157,3 +158,8 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         @param   keys  Keys to delete
         """
         # FIXME Is this needed?
+
+
+class RouteTransformation(CostBearing, metaclass=ABCMeta):
+    """ Route transformation abstract base class """
+    # TODO Think about how this is meant to work...

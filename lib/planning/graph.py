@@ -71,11 +71,23 @@ class Cost(T.Carrier[T.Number], metaclass=ABCMeta):
         return self.payload
 
 
-class Edge(T.Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
+class CostBearing:
+    """ Mixin for classes that incur a cost upon graph traversal """
+    _cost:Cost
+
+    @property
+    def cost(self) -> Cost:
+        return self._cost
+
+    @cost.setter
+    def cost(self, value:Cost) -> None:
+        self._cost = value
+
+
+class Edge(T.Carrier[T.Any], T.Container[Vertex], CostBearing, metaclass=ABCMeta):
     """ Edge abstract base class """
     _vertices:T.Tuple[Vertex, Vertex]
     _directed:bool
-    _cost:Cost
 
     def __init__(self, a:Vertex, b:Vertex, *, directed:bool = False) -> None:
         self._vertices = (a, b)
@@ -97,14 +109,6 @@ class Edge(T.Carrier[T.Any], T.Container[Vertex], metaclass=ABCMeta):
     @property
     def is_directed(self) -> bool:
         return self._directed
-
-    @property
-    def cost(self) -> Cost:
-        return self._cost
-
-    @cost.setter
-    def cost(self, value:Cost) -> None:
-        self._cost = value
 
 
 # Convenience type (rather than a full Graph): An ordered list of edges,
