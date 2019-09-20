@@ -215,7 +215,10 @@ class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
         return transformer(io)
 
     def __add__(self, rhs:RouteIOTransformation) -> RouteIOTransformation:
-        composition = lambda io: self.payload(rhs.payload(io))
+        # Composition is this way around so the summation over the list
+        # of transformers (i.e., in the TransferRoute edge) is done in
+        # the same order as transformers are added
+        composition = lambda io: rhs.payload(self.payload(io))
         return RouteIOTransformation(composition, self.cost + rhs.cost)
 
 
@@ -240,6 +243,9 @@ class RouteTaskTransformation(T.Carrier[Templating], RouteTransformation):
 
         return RouteTaskTransformation(templating, self.cost + rhs.cost)
 
+
+def _noop_io_transformer(io:IOGenerator) -> IOGenerator:
+    return io
 
 class TransferRoute(Edge):
     """ Data transfer route """
