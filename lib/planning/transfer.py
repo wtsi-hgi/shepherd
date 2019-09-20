@@ -61,6 +61,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     * _checksum             :: str x Path -> str
     * set_metadata          :: Path x kwargs -> None
     * delete_metadata       :: Path x args -> None
+    * delete_data           :: Path -> None
     """
     # TODO/FIXME We are using Path throughout. It would probably be more
     # appropriate/general to use something like URI
@@ -169,6 +170,14 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         @param   keys  Keys to delete
         """
         # FIXME Is this needed?
+
+    @abstractmethod
+    def delete_data(self, data:T.Path) -> None:
+        """
+        Delete data from filesystem
+
+        @param   data  File
+        """
 
 
 class RouteTransformation(CostBearing, metaclass=ABCMeta):
