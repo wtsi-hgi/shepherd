@@ -40,6 +40,7 @@ class Templating(metaclass=ABCMeta):
     * templates    :: () -> List[str]
     * filters      :: () -> List[str]
     * add_template :: str x str -> None
+    * get_template :: str -> str
     * add_filter   :: str x Function -> None
     * render       :: str x kwargs -> str
     """

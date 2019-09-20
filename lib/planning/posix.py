@@ -32,7 +32,7 @@ _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-val
 
 class POSIXFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for POSIX-like filesystems """
-    def _identify_by_metadata(self, **metadata:str) -> T.Iterable[T.Path]:
+    def _identify_by_metadata(self, **metadata:str) -> T.FileGenerator:
         raise _NO_METADATA
 
     def set_metadata(self, data:T.Path, **metadata:str) -> None:
@@ -44,11 +44,11 @@ class POSIXFilesystem(FilesystemVertex):
     def _accessible(self, data:T.Path) -> bool:
         return data.exists() and os.access(data, os.R_OK)
 
-    def _identify_by_stat(self, path:T.Path, *, name:str = "*") -> T.Iterable[T.Path]:
+    def _identify_by_stat(self, path:T.Path, *, name:str = "*") -> T.FileGenerator:
         # TODO
         raise NOT_IMPLEMENTED
 
-    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> T.Iterable[T.Path]:
+    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> T.FileGenerator:
         opener = open if not compressed else gzip.open
 
         with opener(fofn, mode="rt") as f:

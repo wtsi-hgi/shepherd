@@ -41,3 +41,7 @@ class Carrier(Generic[_T]):
     @payload.setter
     def payload(self, value:_T) -> None:
         self._payload = value
+
+
+FileGenerator = Iterable[Path]
+IOGenerator = Iterable[Tuple[Path, Path]]
