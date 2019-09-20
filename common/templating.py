@@ -58,18 +58,22 @@ class Templating(metaclass=ABCMeta):
         """ Add a string template to the templating engine """
 
     @abstractmethod
+    def get_template(self, name:str) -> str:
+        """ Return the original template string """
+
+    @abstractmethod
     def add_filter(self, name:str, fn:Filter) -> None:
         """ Add a filter to the templating engine """
 
     @abstractmethod
-    def render(self, template:str, **tags:T.Any) -> str:
+    def render(self, name:str, **tags:T.Any) -> str:
         """ Render a specific template with the given tags """
 
 
 class Jinja2Templating(Templating):
     """ Jinja2-based templating engine """
     _env:Environment
-    _templates:T.Dict[str, Template]
+    _templates:T.Dict[str, T.Tuple[str, Template]]
 
     def __init__(self) -> None:
         self._env = Environment()
@@ -84,16 +88,21 @@ class Jinja2Templating(Templating):
         return list(self._env.filters.keys())
 
     def add_template(self, name:str, template:str) -> None:
-        self._templates[name] = self._env.from_string(template)
+        self._templates[name] = template, self._env.from_string(template)
+
+    def get_template(self, name:str) -> str:
+        template, _ = self._templates[name]
+        return template
 
     def add_filter(self, name:str, fn:Filter) -> None:
         self._env.filters[name] = fn
 
-    def render(self, template:str, **tags:T.Any) -> str:
-        if template not in self._templates:
-            raise TemplatingError(f"No such template {template}")
+    def render(self, name:str, **tags:T.Any) -> str:
+        if name not in self._templates:
+            raise TemplatingError(f"No such template {name}")
 
-        return self._templates[template].render(**tags)
+        _, template = self._templates[name]
+        return template.render(**tags)
 
 
 def templating_factory(cls:T.Type[Templating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None) -> Templating:
