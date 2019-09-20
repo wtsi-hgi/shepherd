@@ -182,7 +182,13 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
 
 
 class RouteTransformation(CostBearing, metaclass=ABCMeta):
-    """ Route transformation abstract base class """
+    """
+    Route transformation abstract base class
+
+    Implementations required:
+    __call__ :: <arbitrary> -> <arbitrary>
+    __add__  :: RouteTransformation -> RouteTransformation
+    """
     @abstractmethod
     def __call__(self, *args:T.Any, **kwargs:T.Any) -> T.Any:
         """ Interface for how the transformation is invoked """
@@ -196,8 +202,9 @@ IOTransformer = T.Callable[[T.IOGenerator], T.IOGenerator]
 
 class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
     """ Transform the I/O stream """
-    def __init__(self, transformer:IOTransformer) -> None:
+    def __init__(self, transformer:IOTransformer, cost:PolynomialComplexity = On) -> None:
         self.payload = transformer
+        self.cost = cost
 
     def __call__(self, io:T.IOGenerator) -> T.IOGenerator:
         transformer = self.payload
@@ -205,15 +212,16 @@ class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
 
     def __add__(self, rhs:RouteIOTransformation) -> RouteIOTransformation:
         composition = lambda io: self.payload(rhs.payload(io))
-        return RouteIOTransformation(composition)
+        return RouteIOTransformation(composition, self.cost + rhs.cost)
 
 
 class RouteTaskTransformation(T.Carrier[Templating], RouteTransformation):
     """ Transform the transfer task """
-    def __init__(self, templating:Templating) -> None:
+    def __init__(self, templating:Templating, cost:PolynomialComplexity = O1) -> None:
         # TODO Subclass this, rather than relying on runtime checks
         assert "wrapper" in templating.templates
         self.payload = templating
+        self.cost = cost
 
     def __call__(self, script:str) -> str:
         templating = self.payload
@@ -226,7 +234,7 @@ class RouteTaskTransformation(T.Carrier[Templating], RouteTransformation):
         templating = copy(self.payload)
         templating.add_template("wrapper", wrapped)
 
-        return RouteTaskTransformation(templating)
+        return RouteTaskTransformation(templating, self.cost + rhs.cost)
 
 
 class TransferRoute(Edge):
