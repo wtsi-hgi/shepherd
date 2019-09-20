@@ -30,6 +30,10 @@ from common.templating import Templating
 from .graph import Vertex, Cost, CostBearing, Edge, Graph
 
 
+FileGenerator = T.Iterable[T.Path]
+IOGenerator = T.Iterable[T.Tuple[T.Path, T.Path]]
+
+
 class UnsupportedByFilesystem(BaseException):
     """ Raised when an unsupported action is attempted on a filesystem """
 
@@ -81,7 +85,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # the model as described here is susceptible to security holes
 
     @abstractmethod
-    def _identify_by_metadata(self, **metadata:str) -> T.FileGenerator:
+    def _identify_by_metadata(self, **metadata:str) -> FileGenerator:
         """
         Identify data by the given set of key-value metadata
 
@@ -90,7 +94,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _identify_by_stat(self, path:T.Path, *, name:str = "*") -> T.FileGenerator:
+    def _identify_by_stat(self, path:T.Path, *, name:str = "*") -> FileGenerator:
         """
         Identify data by a combination of various stat metrics, similar
         to the find(1) utility
@@ -102,7 +106,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # TODO Flesh out parameters and interface
 
     @abstractmethod
-    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> T.FileGenerator:
+    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> FileGenerator:
         """
         Identify data by a file of filenames
 
@@ -112,7 +116,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         @return  Iterator of matching paths
         """
 
-    def identify(self, query:str) -> T.FileGenerator:
+    def identify(self, query:str) -> FileGenerator:
         """
         Identify data based on the given query
 
@@ -198,7 +202,7 @@ class RouteTransformation(CostBearing, metaclass=ABCMeta):
         """ Interface for how transformations should be combined """
 
 
-IOTransformer = T.Callable[[T.IOGenerator], T.IOGenerator]
+IOTransformer = T.Callable[[IOGenerator], IOGenerator]
 
 class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
     """ Transform the I/O stream """
@@ -206,7 +210,7 @@ class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
         self.payload = transformer
         self.cost = cost
 
-    def __call__(self, io:T.IOGenerator) -> T.IOGenerator:
+    def __call__(self, io:IOGenerator) -> IOGenerator:
         transformer = self.payload
         return transformer(io)
 
