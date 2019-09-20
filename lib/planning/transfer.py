@@ -100,11 +100,13 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # TODO Flesh out parameters and interface
 
     @abstractmethod
-    def _identify_by_fofn(self, fofn:T.Path) -> T.Iterable[T.Path]:
+    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> T.Iterable[T.Path]:
         """
         Identify data by a file of filenames
 
-        @param   fofn  File of filenames
+        @param   fofn        File of filenames
+        @param   delimiter   Record delimiter
+        @param   compressed  Is FoFN gzip-compressed
         @return  Iterator of matching paths
         """
 
