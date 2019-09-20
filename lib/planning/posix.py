@@ -22,11 +22,10 @@ import hashlib
 import os
 
 from common import types as T
+from common.constants import BLOCKSIZE
 from common.exceptions import NOT_IMPLEMENTED
 from .transfer import FilesystemVertex, UnsupportedByFilesystem
 
-
-_BLOCKSIZE = 1024
 
 _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-value metadata")
 
@@ -56,7 +55,7 @@ class POSIXFilesystem(FilesystemVertex):
             last = ""
 
             while True:
-                block = f.read(_BLOCKSIZE)
+                block = f.read(BLOCKSIZE)
                 if not block:
                     break
 
@@ -83,7 +82,7 @@ class POSIXFilesystem(FilesystemVertex):
 
         with open(data, "rb") as f:
             while True:
-                block = f.read(_BLOCKSIZE)
+                block = f.read(BLOCKSIZE)
                 if not block:
                     break
 
