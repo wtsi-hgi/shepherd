@@ -18,13 +18,19 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 import os
+from functools import partial
 
 from common import types as T
-from common.templating import Filter
+from common.templating import Jinja2Templating, Filter, templating_factory
 
 
-filters:T.Dict[str, Filter] = {
+_filters:T.Dict[str, Filter] = {
     "dirname":  os.path.dirname,
     "basename": os.path.basename
     # TODO Any other useful filters...
 }
+
+_jinja2 = partial(templating_factory, Jinja2Templating, filters=_filters)
+
+transfer_script = lambda script: _jinja2(templates={"script": script})
+wrapper_script = lambda wrapper: _jinja2(templates={"wrapper": wrapper}, variable_start_string="[[", variable_end_string="]]")
