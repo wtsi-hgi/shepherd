@@ -116,7 +116,7 @@ class Edge(T.Carrier[T.Any], T.Container[Vertex], CostBearing, metaclass=ABCMeta
 # where juxtaposed vertices correspond (i.e., a contiguous route)
 Route = T.List[Edge]
 
-class Graph(T.Container[Edge], metaclass=ABCMeta):
+class Graph(T.Container[Vertex], metaclass=ABCMeta):
     """ Graph abstract base class """
     # NOTE Our graph is a container of edges; contrary to definition, we
     # do not consider unconnected vertices to be in the graph
@@ -129,8 +129,6 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
 
     def __contains__(self, needle:Vertex) -> bool:
         """ Does the graph contain a given vertex? """
-        # NOTE We openly flaunt the interface of typing.Container, as
-        # we're more interested in the vertices, rather than the edges
         return needle in self._atlas
 
     def __iadd__(self, edge:Edge) -> Graph:
@@ -171,6 +169,7 @@ class Graph(T.Container[Edge], metaclass=ABCMeta):
 
     def _shortest_path(self, a:Vertex, b:Vertex) -> Route:
         """ Shortest path between two vertices """
+        # TODO
         raise NOT_IMPLEMENTED
 
     def route(self, *waypoints:Vertex) -> Route:
