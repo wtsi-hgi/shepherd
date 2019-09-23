@@ -27,7 +27,7 @@ from copy import copy
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from common.templating import Templating, Filter
-from .graph import Vertex, Cost, CostBearing, Edge, Graph
+from .graph import Vertex, Cost, CostBearing, Edge
 
 
 FileGenerator = T.Iterable[T.Path]

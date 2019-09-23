@@ -116,7 +116,7 @@ class Edge(T.Carrier[T.Any], T.Container[Vertex], CostBearing, metaclass=ABCMeta
 # where juxtaposed vertices correspond (i.e., a contiguous route)
 Route = T.List[Edge]
 
-class Graph(T.Container[Vertex], metaclass=ABCMeta):
+class Graph(T.Container[Vertex]):
     """ Graph abstract base class """
     # NOTE Our graph is a container of edges; contrary to definition, we
     # do not consider unconnected vertices to be in the graph
