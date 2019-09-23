@@ -76,8 +76,8 @@ class Jinja2Templating(Templating):
     _env:Environment
     _templates:T.Dict[str, T.Tuple[str, Template]]
 
-    def __init__(self) -> None:
-        self._env = Environment()
+    def __init__(self, **kwargs:T.Any) -> None:
+        self._env = Environment(**kwargs)
         self._templates = {}
 
     @property
@@ -106,16 +106,17 @@ class Jinja2Templating(Templating):
         return template.render(**tags)
 
 
-def templating_factory(cls:T.Type[Templating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None) -> Templating:
+def templating_factory(cls:T.Type[Templating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None, **cls_kwargs:T.Any) -> Templating:
     """
     Create Templating engine with given filters and templates
 
-    @param   cls        Templating engine to instantiate
-    @param   filters    Dictionary of filters (optional)
-    @param   templates  Dictionary of templates (optional)
+    @param   cls         Templating engine to instantiate
+    @param   filters     Dictionary of filters (optional)
+    @param   templates   Dictionary of templates (optional)
+    @param   cls_kwargs  Templating class initialisation parameters
     @return  Templating engine
     """
-    templating = cls()
+    templating = cls(**(cls_kwargs or {}))
 
     if filters is not None:
         for name, fn in filters.items():
