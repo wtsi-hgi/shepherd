@@ -30,8 +30,12 @@ from common.templating import Templating, Filter
 from .graph import Vertex, Cost, CostBearing, Edge
 
 
-FileGenerator = T.Iterable[T.Path]
-IOGenerator = T.Iterable[T.Tuple[T.Path, T.Path]]
+# FIXME We are using Path throughout, for now. It would be more
+# appropriate to use something like URI
+DataLocation = T.Path
+
+DataGenerator = T.Iterable[DataLocation]
+IOGenerator = T.Iterable[T.Tuple[DataLocation, DataLocation]]
 
 
 class UnsupportedByFilesystem(BaseException):
@@ -68,13 +72,11 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     * delete_metadata       :: Path x args -> None
     * delete_data           :: Path -> None
     """
-    # TODO/FIXME We are using Path throughout. It would probably be more
-    # appropriate/general to use something like URI
     # NOTE A Vertex is a Carrier; there's probably something useful that
     # we can put in its payload...
 
     @abstractmethod
-    def _accessible(self, data:T.Path) -> bool:
+    def _accessible(self, data:DataLocation) -> bool:
         """
         Check that a file exists and is readable
 
@@ -85,7 +87,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # the model as described here is susceptible to security holes
 
     @abstractmethod
-    def _identify_by_metadata(self, **metadata:str) -> FileGenerator:
+    def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
         """
         Identify data by the given set of key-value metadata
 
@@ -94,7 +96,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _identify_by_stat(self, path:T.Path, *, name:str = "*") -> FileGenerator:
+    def _identify_by_stat(self, path:DataLocation, *, name:str = "*") -> DataGenerator:
         """
         Identify data by a combination of various stat metrics, similar
         to the find(1) utility
@@ -106,7 +108,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # TODO Flesh out parameters and interface
 
     @abstractmethod
-    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> FileGenerator:
+    def _identify_by_fofn(self, fofn:DataLocation, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
         """
         Identify data by a file of filenames
 
@@ -116,7 +118,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         @return  Iterator of matching paths
         """
 
-    def identify(self, query:str) -> FileGenerator:
+    def identify(self, query:str) -> DataGenerator:
         """
         Identify data based on the given query
 
@@ -138,10 +140,10 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _checksum(self, algorithm:str, data:T.Path) -> str:
+    def _checksum(self, algorithm:str, data:DataLocation) -> str:
         """ Checksum a file with the given algorithm """
 
-    def checksum(self, algorithm:str, data:T.Path) -> str:
+    def checksum(self, algorithm:str, data:DataLocation) -> str:
         """
         Checksum a file with the given algorithm
 
@@ -158,7 +160,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         return self._checksum(algorithm, data)
 
     @abstractmethod
-    def set_metadata(self, data:T.Path, **metadata:str) -> None:
+    def set_metadata(self, data:DataLocation, **metadata:str) -> None:
         """
         Set (insert/update) key-value metadata for a given file
 
@@ -167,7 +169,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def delete_metadata(self, data:T.Path, *keys:str) -> None:
+    def delete_metadata(self, data:DataLocation, *keys:str) -> None:
         """
         Remove metadata, by key, from a given file
 
@@ -177,7 +179,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # FIXME Is this needed?
 
     @abstractmethod
-    def delete_data(self, data:T.Path) -> None:
+    def delete_data(self, data:DataLocation) -> None:
         """
         Delete data from filesystem
 
