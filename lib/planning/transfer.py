@@ -25,7 +25,6 @@ from abc import ABCMeta, abstractmethod
 from copy import copy
 
 from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
 from common.templating import Templating
 from .graph import Vertex, Cost, CostBearing, Edge
 
@@ -131,7 +130,9 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # TODO Design and implement query language that ultimately calls
         # the appropriate "_identify_by_*" method(s) and combines their
         # results accordingly
-        raise NOT_IMPLEMENTED
+
+        # FIXME Use the FOFN identifier for now
+        return self._identify_by_fofn(fofn=DataLocation(query))
 
     @property
     @abstractmethod
