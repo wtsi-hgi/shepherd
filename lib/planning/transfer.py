@@ -26,7 +26,7 @@ from copy import copy
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
-from common.templating import Templating, Filter
+from common.templating import Templating
 from .graph import Vertex, Cost, CostBearing, Edge
 
 
@@ -291,7 +291,7 @@ class _NoopScriptTransformer(RouteScriptTransformation):
     def __radd__(self, lhs:RouteScriptTransformation) -> RouteScriptTransformation:
         return lhs
 
-# These zeros are needed for the algebra of the transformers.
+# These zeros are needed for the algebra over the transformers
 _zeros = {
     RouteIOTransformation:     _noop_io_transformer,
     RouteScriptTransformation: _NoopScriptTransformer()
@@ -333,10 +333,9 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         @return  Iterator of transfer plan steps
         """
         # Wrap the transfer script with any necessary transformations
-        templating = self._templating
-        script = templating.get_template("script")
+        script = self._templating.get_template("script")
         wrapper = self.get_transform(RouteScriptTransformation)
-        templating.add_template("transfer", wrapper(script))
+        self._templating.add_template("transfer", wrapper(script))
 
         io_generator = ((in_file, in_file) for in_file in self.a.identify(query))
         io_transformer = self.get_transform(RouteIOTransformation)
