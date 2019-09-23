@@ -269,61 +269,38 @@ class RouteScriptTransformation(T.Carrier[Templating], RouteTransformation):
 
 _noop_io_transformer = RouteIOTransformation(lambda io: io)
 
-class _NoopTemplating(Templating):
+class _NoopScriptTransformer(RouteScriptTransformation):
     """
-    This is an engine-agnostic templating engine that simply returns its
-    input when passed through in the "script" render tag, regardless of
-    the template specified. A root script is needed for when this engine
-    is first in an expression.
+    This is an templating engine-agnostic RouteScriptTransformation that
+    simply returns whatever is passed through it
     """
-    # FIXME? This only works as a noop RouteScriptTransformation when on
-    # the left (i.e., noop + x = x != x + noop). We only need it to work
-    # on the left, but this is quite a messy solution :(
-    _root:str
-
-    def __init__(self, root:str) -> None:
-        self._root = root
-
-    @property
-    def templates(self) -> T.List[str]:
-        # "wrapper" has to be here because of the inclusion assertion
-        return ["wrapper"]
-
-    @property
-    def filters(self) -> T.List[str]:
+    def __init__(self) -> None:
         pass
 
-    def add_template(self, name:str, template:str) -> None:
-        pass
+    def __call__(self, script:str) -> str:
+        return script
 
-    def get_template(self, name:str) -> str:
-        return self._root
+    def __add__(self, rhs:RouteScriptTransformation) -> RouteScriptTransformation:
+        return rhs
 
-    def add_filter(self, name:str, fn:Filter) -> None:
-        pass
+    def __radd__(self, lhs:RouteScriptTransformation) -> RouteScriptTransformation:
+        return lhs
 
-    def render(self, name:str, **tags:T.Any) -> str:
-        return tags["script"]
+# These zeros are needed for the algebra of the transformers.
+_zeros = {
+    RouteIOTransformation:     _noop_io_transformer,
+    RouteScriptTransformation: _NoopScriptTransformer()
+}
 
 
 class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
     """ Data transfer route """
     _templating:Templating
-    _zero:T.Dict[T.Type[RouteTransformation], RouteTransformation]
 
     def __init__(self, from_fs:FilesystemVertex, to_fs:FilesystemVertex, *, templating:Templating, cost:PolynomialComplexity = On) -> None:
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates
         self._templating = templating
-        script = templating.get_template("script")
-
-        # These zeros are needed for the algebra of the transformers.
-        # The IO transformer zero could be a ClassVar, but currently the
-        # script transformer zero needs to know the root script to work.
-        self._zero = {
-            RouteIOTransformation: RouteIOTransformation(_noop_io_transformer),
-            RouteScriptTransformation: RouteScriptTransformation(_NoopTemplating(script))
-        }
 
         self.payload = []
         self.cost = cost
@@ -339,4 +316,4 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
     def get_transform(self, transform_type:T.Type[RouteTransformation]) -> T.Any:
         """ Filter the transforms by type and compose """
         transformers = (t for t in self.payload if isinstance(t, transform_type))
-        return sum(transformers, self._zero[transform_type])
+        return sum(transformers, _zeros[transform_type])
