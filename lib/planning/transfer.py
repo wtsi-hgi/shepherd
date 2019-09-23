@@ -37,6 +37,9 @@ DataLocation = T.Path
 DataGenerator = T.Iterable[DataLocation]
 IOGenerator = T.Iterable[T.Tuple[DataLocation, DataLocation]]
 
+# Generator of triples: script, input data, output data
+TransferGenerator = T.Iterable[T.Tuple[str, DataLocation, DataLocation]]
+
 
 class UnsupportedByFilesystem(BaseException):
     """ Raised when an unsupported action is attempted on a filesystem """
@@ -319,3 +322,27 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         """ Filter the transforms by type and compose """
         transformers = (t for t in self.payload if isinstance(t, transform_type))
         return sum(transformers, _zeros[transform_type])
+
+    def plan(self, query:str) -> TransferGenerator:
+        """
+        Identify data from the sending filesystem vertex, based on the
+        given query, and pair this with the rendered transformation
+        script and output location (for the receiving filesystem vertex)
+
+        @param   query  Search criteria
+        @return  Iterator of transfer plan steps
+        """
+        # Wrap the transfer script with any necessary transformations
+        templating = self._templating
+        script = templating.get_template("script")
+        wrapper = self.get_transform(RouteScriptTransformation)
+        templating.add_template("transfer", wrapper(script))
+
+        io_generator = ((in_file, in_file) for in_file in self.a.identify(query))
+        io_transformer = self.get_transform(RouteIOTransformation)
+
+        for in_file, out_file in io_transformer(io_generator):
+            # TODO? Do I need to cast in/out_file to string for render?
+            rendered = templating.render("transfer", input=in_file, output=out_file)
+
+            yield rendered, in_file, out_file
