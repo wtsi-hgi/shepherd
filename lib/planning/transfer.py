@@ -38,7 +38,7 @@ DataLocation = T.Path
 DataGenerator = T.Iterable[DataLocation]
 IOGenerator = T.Iterable[T.Tuple[DataLocation, DataLocation]]
 
-# Generator of triples: script, input data, output data
+# Generator of triples: script, source location, target location
 TransferGenerator = T.Iterable[T.Tuple[str, DataLocation, DataLocation]]
 
 
@@ -240,14 +240,14 @@ class RouteScriptTransformation(T.Carrier[Templating], RouteTransformation):
     Script:
 
         #!/usr/bin/env bash
-        transfer "{{ input }}" "{{ output }}"
+        transfer "{{ source }}" "{{ target }}"
 
     Wrapper:
 
         #!/usr/bin/env bash
-        echo "Starting transfer of {{ input }}"
+        echo "Starting transfer of {{ source }}"
         [[ script ]]
-        echo "Completed transfer to {{ output }}"
+        echo "Completed transfer to {{ target }}"
 
     """
     def __init__(self, templating:Templating, cost:PolynomialComplexity = O1) -> None:
@@ -312,7 +312,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
 
         NOTE The templating engine that is injected into as instance of
         this class MUST define a template named "script", which contains
-        "input" and "output" variables.
+        "source" and "target" variables.
         """
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates
@@ -355,7 +355,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         """
         Identify data from the source filesystem vertex, based on the
         given query, and pair this with the rendered transformation
-        script and output location (for the target filesystem vertex)
+        script and target filesystem location
 
         @param   query  Search criteria
         @return  Iterator of transfer plan steps
@@ -365,7 +365,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
     def _plan_by_data_generator(self, data:DataGenerator) -> TransferGenerator:
         """
         Pair the incoming data stream with the rendered transformation
-        script and output location (for the target filesystem vertex)
+        script and target filesystem location
 
         @param   data  Input data generator
         @return  Iterator of transfer plan steps
@@ -376,14 +376,12 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         self._templating.add_template("transfer", wrapper(script))
 
         # NOTE Unless it's modified by the transfer script (i.e., by
-        # applying filters to the "output" variable), or by a
-        # RouteIOTransformation, the output location is assumed to be
-        # identical to the input location
-        io_generator = ((in_file, in_file) for in_file in data)
+        # applying filters to the "target" variable), or by an I/O route
+        # transformation, the target location is assumed to be identical
+        # to the source location
+        io_generator = ((source, source) for source in data)
         io_transformer = self.get_transform(RouteIOTransformation)
 
-        for in_file, out_file in io_transformer(io_generator):
-            # TODO? Do I need to cast in/out_file to string for render?
-            rendered = self._templating.render("transfer", input=in_file, output=out_file)
-
-            yield rendered, in_file, out_file
+        for source, target in io_transformer(io_generator):
+            rendered = self._templating.render("transfer", source=source, target=target)
+            yield rendered, source, target
