@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+from common import types as T
 from .posix import POSIXFilesystem
 from .irods import iRODSFilesystem
-from .templating import transfer_script
+from .templating import transfer_script, load_template
 from .transfer import TransferRoute, PolynomialComplexity, On
 
 
-_script = transfer_script("""#!/usr/bin/env bash
-
-echo "{{ input }} -> {{ output }}"
-
-""")
+_script = transfer_script(load_template(T.Path("templates/posix_to_irods.sh.j2")))
 
 def posix_to_irods_factory(posix:POSIXFilesystem, irods:iRODSFilesystem, *, cost:PolynomialComplexity = On) -> TransferRoute:
     """ Create POSIX to iRODS route """

@@ -34,3 +34,9 @@ _jinja2 = partial(templating_factory, Jinja2Templating, filters=_filters)
 
 transfer_script = lambda script: _jinja2(templates={"script": script})
 wrapper_script = lambda wrapper: _jinja2(templates={"wrapper": wrapper}, variable_start_string="[[", variable_end_string="]]")
+
+
+def load_template(path:T.Path) -> str:
+    # Load template from file
+    with open(path, mode="rt") as f:
+        return f.read()

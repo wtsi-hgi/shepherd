@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# Create a temporary directory for restart info
+declare RESTART_INFO="$(mktemp -d)"
+trap 'rm -rf "${RESTART_INFO}"' EXIT
+
+iput -fKT --wlock --retries 3 \
+     -X "${RESTART_INFO}/restart" \
+     --lfrestart "${RESTART_INFO}/lfrestart" \
+     "{{ input }}" "{{ output }}"
