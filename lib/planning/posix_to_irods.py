@@ -18,14 +18,17 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from .posix import POSIXFilesystem
-# from .irods import iRODSFilesystem
+from .irods import iRODSFilesystem
 from .templating import transfer_script
-from .transfer import TransferRoute
+from .transfer import TransferRoute, PolynomialComplexity, On
 
 
-# FIXME This is for testing only
-iRODSFilesystem = POSIXFilesystem
+_script = transfer_script("""#!/usr/bin/env bash
 
-posix_to_irods = TransferRoute(POSIXFilesystem(), iRODSFilesystem(), templating=transfer_script("""
-    # TODO Script in here!
-"""))
+echo "{{ input }} -> {{ output }}"
+
+""")
+
+def posix_to_irods_factory(posix:POSIXFilesystem, irods:iRODSFilesystem, *, cost:PolynomialComplexity = On) -> TransferRoute:
+    """ Create POSIX to iRODS route """
+    return TransferRoute(posix, irods, templating=_script, cost=cost)
