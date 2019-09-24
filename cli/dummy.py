@@ -18,8 +18,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from common import types as T
-from lib.planning.posix import POSIXFilesystem
-from lib.planning.irods import iRODSFilesystem
+from lib.planning.filesystems import POSIXFilesystem, iRODSFilesystem
 from lib.planning.route_factories import posix_to_irods_factory
 
 

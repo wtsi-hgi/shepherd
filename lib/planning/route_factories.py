@@ -18,10 +18,13 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from common import types as T
-from .posix import POSIXFilesystem
-from .irods import iRODSFilesystem
+from .filesystems import POSIXFilesystem, iRODSFilesystem
 from .templating import transfer_script, load_template
 from .transfer import TransferRoute, PolynomialComplexity, On
+
+
+# TODO This module probably won't be necessary in the end because routes
+# will be defined in software or by configuration
 
 
 _script = transfer_script(load_template(T.Path("lib/planning/templates/posix_to_irods.sh.j2")))

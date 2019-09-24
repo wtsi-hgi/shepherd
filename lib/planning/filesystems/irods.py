@@ -19,7 +19,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
-from .transfer import FilesystemVertex, DataLocation, DataGenerator
+from ..transfer import FilesystemVertex, DataLocation, DataGenerator
 
 # TODO Obviously... :P
 class iRODSFilesystem(FilesystemVertex):

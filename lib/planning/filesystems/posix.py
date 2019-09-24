@@ -24,7 +24,7 @@ import os
 from common import types as T
 from common.constants import BLOCKSIZE
 from common.exceptions import NOT_IMPLEMENTED
-from .transfer import DataGenerator, FilesystemVertex, UnsupportedByFilesystem
+from ..transfer import DataGenerator, FilesystemVertex, UnsupportedByFilesystem
 
 
 _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-value metadata")
