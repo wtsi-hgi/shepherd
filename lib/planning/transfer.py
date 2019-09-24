@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from copy import copy
+from functools import singledispatch
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
@@ -302,10 +303,10 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
     """ Data transfer route """
     _templating:Templating
 
-    def __init__(self, from_fs:FilesystemVertex, to_fs:FilesystemVertex, *, templating:Templating, cost:PolynomialComplexity = On) -> None:
+    def __init__(self, source:FilesystemVertex, target:FilesystemVertex, *, templating:Templating, cost:PolynomialComplexity = On) -> None:
         """
-        @param  from_fs     Sending filesystem vertex
-        @param  to_fs       Receiving filesystem vertex
+        @param  source      Source filesystem vertex
+        @param  target      Target filesystem vertex
         @param  templating  Templating engine that provides the script
         @param  cost        Route cost
 
@@ -320,7 +321,24 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         self.payload = []
         self.cost = cost
 
-        super().__init__(from_fs, to_fs, directed=True)
+        super().__init__(source, target, directed=True)
+
+        # TODO From Python 3.8 there will be a singledispatchmethod
+        # decorator; move to this when it's available, rather than using
+        # the following workaround
+        self.plan = singledispatch(self.plan)
+        self.plan.register(DataGenerator, self._plan_by_data_generator)
+        self.plan.register(str, self._plan_by_query)
+
+    @property
+    def source(self) -> FilesystemVertex:
+        # Convenience alias
+        return self.a
+
+    @property
+    def target(self) -> FilesystemVertex:
+        # Convenience alias
+        return self.b
 
     def __iadd__(self, transform:RouteTransformation) -> TransferRoute:
         """ Add a transformation to the route """
@@ -333,13 +351,23 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         transformers = (t for t in self.payload if isinstance(t, transform_type))
         return sum(transformers, _zeros[transform_type])
 
-    def plan(self, query:str) -> TransferGenerator:
+    def _plan_by_query(self, query:str) -> TransferGenerator:
         """
-        Identify data from the sending filesystem vertex, based on the
+        Identify data from the source filesystem vertex, based on the
         given query, and pair this with the rendered transformation
-        script and output location (for the receiving filesystem vertex)
+        script and output location (for the target filesystem vertex)
 
         @param   query  Search criteria
+        @return  Iterator of transfer plan steps
+        """
+        return self._plan_by_data_generator(self.source.identify(query))
+
+    def _plan_by_data_generator(self, data:DataGenerator) -> TransferGenerator:
+        """
+        Pair the incoming data stream with the rendered transformation
+        script and output location (for the target filesystem vertex)
+
+        @param   data  Input data generator
         @return  Iterator of transfer plan steps
         """
         # Wrap the transfer script with any necessary transformations
@@ -347,7 +375,11 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         wrapper = self.get_transform(RouteScriptTransformation)
         self._templating.add_template("transfer", wrapper(script))
 
-        io_generator = ((in_file, in_file) for in_file in self.a.identify(query))
+        # NOTE Unless it's modified by the transfer script (i.e., by
+        # applying filters to the "output" variable), or by a
+        # RouteIOTransformation, the output location is assumed to be
+        # identical to the input location
+        io_generator = ((in_file, in_file) for in_file in data)
         io_transformer = self.get_transform(RouteIOTransformation)
 
         for in_file, out_file in io_transformer(io_generator):
@@ -355,3 +387,20 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
             rendered = templating.render("transfer", input=in_file, output=out_file)
 
             yield rendered, in_file, out_file
+
+    @T.overload
+    def plan(self, query:str) -> TransferGenerator:
+        ...
+    @T.overload
+    def plan(self, data:DataGenerator) -> TransferGenerator:
+        ...
+    def plan(self, source) -> TransferGenerator:
+        """
+        Pair the source data locations with the rendered transformation
+        script and output location (for the target filesystem vertex)
+
+        @param   source  Data location source
+        @return  Iterator of transfer plan steps
+        """
+        # This should only happen for unregistered types
+        raise NOT_IMPLEMENTED
