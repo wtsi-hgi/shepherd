@@ -7,7 +7,7 @@ declare RESTART_INFO="$(mktemp -d)"
 trap 'rm -rf "${RESTART_INFO}"' EXIT
 
 # Create collection for target, if it doesn't already exist
-imkdir -fp "{{ target | dirname }}"
+imkdir -p "{{ target | dirname }}"
 
 # Copy source file to target data object
 iput -fKT --wlock --retries 3 \
