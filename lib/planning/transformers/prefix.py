@@ -17,24 +17,22 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from common import types as T
-from lib.planning.transfer import DataLocation
-from lib.planning.filesystems import POSIXFilesystem, iRODSFilesystem
-from lib.planning.transformers import prefix
-from lib.planning.route_factories import posix_to_irods_factory
+from ..transfer import RouteIOTransformation, DataLocation, IOGenerator
 
+def prefix(prefix:DataLocation) -> RouteIOTransformation:
+    """
+    Route IO transformation factory that prefixes the target path with
+    the given path
 
-def main(*args:str) -> None:
-    fofn, *_ = args
+    @param   prefix  Data location to prefix
+    @return  IO transformer
+    """
+    # TODO This will need to change when DataLocation becomes more
+    # generic/URI based, rather than just a wrapper to pathlib.Path
+    assert prefix.is_absolute()
 
-    posix = POSIXFilesystem()
-    irods = iRODSFilesystem()
-    transfer = posix_to_irods_factory(posix, irods)
-    transfer += prefix(DataLocation("/here/is/a/prefix"))
+    def _prefixer(io:IOGenerator) -> IOGenerator:
+        for source, target in io:
+            yield source, prefix / target.relative_to(target.root)
 
-    files = posix._identify_by_fofn(T.Path(fofn))
-    for script, source, target in transfer.plan(files):
-        print(f"** Script for {source} to {target}")
-        print("-" * 72)
-        print(script)
-        print("=" * 72)
+    return RouteIOTransformation(_prefixer)
