@@ -19,6 +19,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from ..transfer import RouteIOTransformation, DataLocation, IOGenerator
 
+
 def prefix(prefix:DataLocation) -> RouteIOTransformation:
     """
     Route IO transformation factory that prefixes the target path with
