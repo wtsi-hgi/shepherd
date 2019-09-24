@@ -25,6 +25,7 @@ from abc import ABCMeta, abstractmethod
 from copy import copy
 
 from common import types as T
+from common.exceptions import NOT_IMPLEMENTED
 from common.templating import Templating
 from .graph import Vertex, Cost, CostBearing, Edge
 
@@ -130,9 +131,7 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
         # TODO Design and implement query language that ultimately calls
         # the appropriate "_identify_by_*" method(s) and combines their
         # results accordingly
-
-        # FIXME Use the FOFN identifier for now
-        return self._identify_by_fofn(fofn=DataLocation(query))
+        raise NOT_IMPLEMENTED
 
     @property
     @abstractmethod
@@ -232,7 +231,7 @@ class RouteScriptTransformation(T.Carrier[Templating], RouteTransformation):
     """
     Transform the transfer script
 
-    This wraps the `script` variable, when called, with the `wrapper`
+    This wraps the 'script' variable, when called, with the 'wrapper'
     template. Note that it is probably a good idea to give your wrapper
     templates different variable demarcation strings, else the variables
     in the root script will get nullified. For example:
@@ -304,6 +303,16 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
     _templating:Templating
 
     def __init__(self, from_fs:FilesystemVertex, to_fs:FilesystemVertex, *, templating:Templating, cost:PolynomialComplexity = On) -> None:
+        """
+        @param  from_fs     Sending filesystem vertex
+        @param  to_fs       Receiving filesystem vertex
+        @param  templating  Templating engine that provides the script
+        @param  cost        Route cost
+
+        NOTE The templating engine that is injected into as instance of
+        this class MUST define a template named "script", which contains
+        "input" and "output" variables.
+        """
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates
         self._templating = templating
