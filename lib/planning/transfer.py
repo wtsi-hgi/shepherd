@@ -326,7 +326,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         # TODO From Python 3.8 there will be a singledispatchmethod
         # decorator; move to this when it's available, rather than using
         # the following workaround
-        self.plan = singledispatch(self.plan)
+        self.plan = singledispatch(self._plan_by_data_generator)
         self.plan.register(DataGenerator, self._plan_by_data_generator)
         self.plan.register(str, self._plan_by_query)
 
@@ -384,23 +384,6 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
 
         for in_file, out_file in io_transformer(io_generator):
             # TODO? Do I need to cast in/out_file to string for render?
-            rendered = templating.render("transfer", input=in_file, output=out_file)
+            rendered = self._templating.render("transfer", input=in_file, output=out_file)
 
             yield rendered, in_file, out_file
-
-    @T.overload
-    def plan(self, query:str) -> TransferGenerator:
-        ...
-    @T.overload
-    def plan(self, data:DataGenerator) -> TransferGenerator:
-        ...
-    def plan(self, source) -> TransferGenerator:
-        """
-        Pair the source data locations with the rendered transformation
-        script and output location (for the target filesystem vertex)
-
-        @param   source  Data location source
-        @return  Iterator of transfer plan steps
-        """
-        # This should only happen for unregistered types
-        raise NOT_IMPLEMENTED

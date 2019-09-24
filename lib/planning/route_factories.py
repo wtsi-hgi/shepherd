@@ -24,7 +24,7 @@ from .templating import transfer_script, load_template
 from .transfer import TransferRoute, PolynomialComplexity, On
 
 
-_script = transfer_script(load_template(T.Path("templates/posix_to_irods.sh.j2")))
+_script = transfer_script(load_template(T.Path("lib/planning/templates/posix_to_irods.sh.j2")))
 
 def posix_to_irods_factory(posix:POSIXFilesystem, irods:iRODSFilesystem, *, cost:PolynomialComplexity = On) -> TransferRoute:
     """ Create POSIX to iRODS route """

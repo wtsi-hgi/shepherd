@@ -17,9 +17,22 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from common.exceptions import NOT_IMPLEMENTED
+from common import types as T
+from lib.planning.posix import POSIXFilesystem
+from lib.planning.irods import iRODSFilesystem
+from lib.planning.route_factories import posix_to_irods_factory
 
 
 def main(*args:str) -> None:
-    """ CLI entrypoint """
-    raise NOT_IMPLEMENTED
+    fofn, *_ = args
+
+    posix = POSIXFilesystem()
+    irods = iRODSFilesystem()
+    transfer = posix_to_irods_factory(posix, irods)
+
+    files = posix._identify_by_fofn(T.Path(fofn))
+    for script, source, target in transfer.plan(files):
+        print(f"** Script for {source} to {target}")
+        print("-" * 72)
+        print(script)
+        print("=" * 72)
