@@ -18,15 +18,19 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 import os
+import re
 from functools import partial
 
 from common import types as T
 from common.templating import Jinja2Templating, Filter, templating_factory
 
 
+_sh_escape = re.compile(r"([\"$])")
+
 _filters:T.Dict[str, Filter] = {
-    "dirname":  os.path.dirname,
-    "basename": os.path.basename
+    "dirname":   os.path.dirname,
+    "basename":  os.path.basename,
+    "sh_escape": partial(_sh_escape.sub, r"\\\1")
     # TODO Any other useful filters...
 }
 

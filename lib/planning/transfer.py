@@ -383,5 +383,5 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         io_transformer = self.get_transform(RouteIOTransformation)
 
         for source, target in io_transformer(io_generator):
-            rendered = self._templating.render("transfer", source=source, target=target)
+            rendered = self._templating.render("transfer", source=str(source), target=str(target))
             yield rendered, source, target
