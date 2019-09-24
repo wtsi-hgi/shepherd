@@ -71,7 +71,8 @@ class POSIXFilesystem(FilesystemVertex):
 
                     last = record_chunks[-1]
 
-            yield T.Path(last)
+            if last:
+                yield T.Path(last)
 
     @property
     def supported_checksums(self) -> T.List[str]:
