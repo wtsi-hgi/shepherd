@@ -1,0 +1,43 @@
+- [ ] Common
+  - [ ] Typing
+    - This is a moving target...
+  - [X] Time
+  - [X] Templating
+  - [ ] Logging
+- [ ] Planning Engine
+  - [X] Graph abstraction
+    - [X] Vertex
+    - [X] Cost
+    - [X] Edge
+    - [X] Graph
+  - [X] Templating implementation
+  - [X] Transfer abstraction
+    - [ ] Filesystem vertex
+      - Mostly completed, except for querying interface and abstraction
+        of identifying files by stat
+    - [X] Route transformation
+    - [X] Route
+    - [ ] Other abstractions
+      - [X] Polynomial complexity cost
+      - [ ] File (and combinations thereof) types
+        - This is currently derived from pathlib.Path, it would be
+          better to be URI-based
+  - [ ] Implementation
+    - [ ] Filesystems
+      - [ ] POSIX
+        - Completed save identification by stat, dependant upon
+          abstraction
+      - [ ] iRODS
+        - Stubbed out for now...
+    - [ ] Transformations
+      - [X] Path prefixer
+      - [X] Common path stripper
+      - [X] Last n path component taker
+      - [ ] Archived structure canonicaliser
+    - [ ] Routes
+      - [X] POSIX to iRODS
+      - [ ] iRODS to POSIX
+- [ ] State Engine
+  - [ ] ...
+- [ ] Execution Engine
+  - [ ] ...
