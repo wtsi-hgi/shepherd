@@ -20,7 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 from common import types as T
 from lib.planning.transfer import DataLocation
 from lib.planning.filesystems import POSIXFilesystem, iRODSFilesystem
-from lib.planning.transformers import strip_common_prefix, last_n_components, prefix
+from lib.planning.transformers import strip_common_prefix, last_n_components, prefix, verbosity
 from lib.planning.route_factories import posix_to_irods_factory
 
 
@@ -33,6 +33,7 @@ def main(*args:str) -> None:
     transfer += strip_common_prefix
     transfer += prefix(DataLocation("/here/is/a/prefix"))
     transfer += last_n_components(3)
+    transfer += verbosity
 
     files = posix._identify_by_fofn(T.Path(fofn))
     for script, source, target in transfer.plan(files):

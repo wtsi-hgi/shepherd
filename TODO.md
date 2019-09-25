@@ -29,7 +29,7 @@
   - [ ] Implementation
     - [ ] Filesystems
       - [ ] POSIX
-        - Completed save identification by `stat`, dependant upon
+        - Completed, except for identification by `stat`, dependant upon
           abstraction
       - [ ] iRODS
         - Stubbed out for now...
@@ -41,6 +41,7 @@
       - [X] Path prefixer
       - [X] Common path stripper
       - [X] Last n path component taker
+      - [X] Verbose/debugging wrapper
       - [ ] Archived structure canonicaliser
     - [ ] Routes
       - [X] POSIX to iRODS
