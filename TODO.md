@@ -52,9 +52,8 @@
 - [ ] State Engine
   - [X] Engine abstraction
   - [ ] Engine implementations
-    - [ ] Filesystem/SQLite
-      - [ ] Synchronisation primitives
-      - [ ] Database interface
+    - [ ] Native
+      - [ ] SQLite interface
     - [ ] Redis
       - *Not for initial release...*
   - [ ] Client
