@@ -50,7 +50,14 @@
       - [ ] POSIX to POSIX
 
 - [ ] State Engine
-  - [ ] ...
+  - [X] Engine abstraction
+  - [ ] Engine implementations
+    - [ ] Filesystem/SQLite
+      - [ ] Synchronisation primitives
+      - [ ] Database interface
+    - [ ] Redis
+      - *Not for initial release...*
+  - [ ] Client
 
 - [ ] Execution Engine
   - *Subtasks pending...*
