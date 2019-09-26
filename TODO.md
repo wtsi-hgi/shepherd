@@ -42,6 +42,7 @@
       - [X] Common path stripper
       - [X] Last n path component taker
       - [X] Telemetry wrapper
+      - [X] Debugging wrapper
       - [ ] Archived structure canonicaliser
     - [ ] Routes
       - [X] POSIX to iRODS

@@ -21,8 +21,12 @@ from ..transfer import RouteScriptTransformation
 from ..templating import wrapper_script
 
 
-telemetry = RouteScriptTransformation(wrapper_script(r"""#!/usr/bin/env bash
+# Convenience wrapper
+def _wrapper(script:str, shebang:str = "/usr/bin/env bash") -> RouteScriptTransformation:
+    return RouteScriptTransformation(wrapper_script(f"#!{shebang}\n{script}"))
 
+
+telemetry = _wrapper(r"""
 declare start="$(date +%s)"
 
 cat >&2 <<-EOF
@@ -53,4 +57,11 @@ cat >&2 <<-EOF
 	## Run Time: ${runtime} seconds
 	#### END TELEMETRY #####################################################
 	EOF
-"""))
+""")
+
+
+debugging = _wrapper(r"""
+set -x
+
+[[ script ]]
+""")
