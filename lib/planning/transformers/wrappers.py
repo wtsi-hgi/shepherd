@@ -21,15 +21,20 @@ from ..transfer import RouteScriptTransformation
 from ..templating import wrapper_script
 
 
-_verbosity = wrapper_script(r"""#!/usr/bin/env bash
+telemetry = RouteScriptTransformation(wrapper_script(r"""#!/usr/bin/env bash
 
 declare start="$(date +%s)"
 
 cat >&2 <<-EOF
-	## source: {{ source }}
-	## target: {{ target }}
-	## hostname: $(hostname)
-	## start time: $(date -d "@${start}")
+	#### START TELEMETRY ###################################################
+	## Source: {{ from }} {{ source | sh_escape }}
+	## Target: {{ to }} {{ target | sh_escape }}
+	## Username: $(id -un) ($(id -u))
+	## Hostname: $(hostname)
+	## Start Time: $(date -d "@${start}")
+	## Environment:
+	$(env | sed 's/^/## * /')
+	#### START EXECUTION ###################################################
 	EOF
 
 # Run script in subshell
@@ -42,10 +47,10 @@ declare finish="$(date +%s)"
 declare runtime="$(( finish - start ))"
 
 cat >&2 <<-EOF
-	## exit status: ${exit_status}
-	## finish time: $(date -d "@${finish}")
-	## run time: ${runtime} seconds
+	#### END EXECUTION #####################################################
+	## Exit Status: ${exit_status}
+	## Finish Time: $(date -d "@${finish}")
+	## Run Time: ${runtime} seconds
+	#### END TELEMETRY #####################################################
 	EOF
-""")
-
-verbosity = RouteScriptTransformation(_verbosity)
+"""))

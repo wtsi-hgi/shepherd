@@ -32,6 +32,8 @@ _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-val
 
 class POSIXFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for POSIX-like filesystems """
+    _name = "POSIX"
+
     def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
         raise _NO_METADATA
 

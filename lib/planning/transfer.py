@@ -79,6 +79,13 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     # NOTE A Vertex is a Carrier; there's probably something useful that
     # we can put in its payload...
 
+    # TODO? This could be used as scheme, in the URI sense
+    _name:T.ClassVar[str]
+
+    @property
+    def name(self) -> str:
+        return self.__class__._name
+
     @abstractmethod
     def _accessible(self, data:DataLocation) -> bool:
         """
@@ -311,8 +318,13 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         @param  cost        Route cost
 
         NOTE The templating engine that is injected into as instance of
-        this class MUST define a template named "script", which contains
-        "source" and "target" variables.
+        this class MUST define a template named "script", in which you
+        may use the following variables:
+
+        * from    Source filesystem
+        * source  Source location
+        * to      Target filesystem
+        * target  Target filesystem
         """
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates
@@ -383,5 +395,13 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         io_transformer = self.get_transform(RouteIOTransformation)
 
         for source, target in io_transformer(io_generator):
-            rendered = self._templating.render("transfer", source=str(source), target=str(target))
+            tags = {
+                "from":   self.source.name,  # Source filesystem
+                "source": str(source),       # Source location
+
+                "to":     self.target.name,  # Target filesystem
+                "target": str(target),       # Target location
+            }
+
+            rendered = self._templating.render("transfer", **tags)
             yield rendered, source, target

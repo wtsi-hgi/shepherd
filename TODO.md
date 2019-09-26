@@ -41,11 +41,12 @@
       - [X] Path prefixer
       - [X] Common path stripper
       - [X] Last n path component taker
-      - [X] Verbose/debugging wrapper
+      - [X] Telemetry wrapper
       - [ ] Archived structure canonicaliser
     - [ ] Routes
       - [X] POSIX to iRODS
       - [ ] iRODS to POSIX
+      - [ ] POSIX to POSIX
 
 - [ ] State Engine
   - [ ] ...

@@ -24,6 +24,8 @@ from ..transfer import FilesystemVertex, DataLocation, DataGenerator
 # TODO Obviously... :P
 class iRODSFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for iRODS filesystems """
+    _name = "iRODS"
+
     def _accessible(self, data:DataLocation) -> bool:
         raise NOT_IMPLEMENTED
 
