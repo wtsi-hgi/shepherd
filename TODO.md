@@ -54,6 +54,10 @@
   - [ ] Engine implementations
     - [ ] Native
       - [ ] SQLite interface
+      - [ ] Schema
+        - [X] Process details
+        - [X] Planning data
+        - [ ] Execution state
     - [ ] Redis
       - *Not for initial release...*
   - [ ] Client
