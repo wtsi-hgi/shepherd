@@ -66,15 +66,16 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     Filesystem vertex abstract base class
 
     Implementations required:
-    * _accessible           :: Path -> bool
-    * _identify_by_metadata :: Path x kwargs -> Iterable[Path]
-    * _identify_by_stat     :: Path x (TODO) -> Iterable[Path]
-    * _identify_by_fofn     :: Path -> Iterable[Path]
+    * _accessible           :: DataLocation -> bool
+    * _identify_by_metadata :: DataLocation x kwargs -> Iterable[DataLocation]
+    * _identify_by_stat     :: DataLocation x (TODO) -> Iterable[DataLocation]
+    * _identify_by_fofn     :: DataLocation -> Iterable[DataLocation]
     * supported_checksums   :: () -> List[str]
-    * _checksum             :: str x Path -> str
-    * set_metadata          :: Path x kwargs -> None
-    * delete_metadata       :: Path x args -> None
-    * delete_data           :: Path -> None
+    * _checksum             :: str x DataLocation -> str
+    * _size                 :: DataLocation -> int
+    * set_metadata          :: DataLocation x kwargs -> None
+    * delete_metadata       :: DataLocation x args -> None
+    * delete_data           :: DataLocation -> None
     """
     # NOTE A Vertex is a Carrier; there's probably something useful that
     # we can put in its payload...
@@ -169,6 +170,22 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
             raise DataInaccessible(f"Cannot access {data}")
 
         return self._checksum(algorithm, data)
+
+    @abstractmethod
+    def _size(self, data:DataLocation) -> int:
+        """ Return the size of a file in bytes """
+
+    def size(self, data:DataLocation) -> int:
+        """
+        Return the size of a file in bytes
+
+        @param   data       File to checksum
+        @return  Checksum of file
+        """
+        if not self._accessible(data):
+            raise DataInaccessible(f"Cannot access {data}")
+
+        return self._size(data)
 
     @abstractmethod
     def set_metadata(self, data:DataLocation, **metadata:str) -> None:

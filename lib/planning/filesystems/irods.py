@@ -45,6 +45,9 @@ class iRODSFilesystem(FilesystemVertex):
     def _checksum(self, algorithm:str, data:DataLocation) -> str:
         raise NOT_IMPLEMENTED
 
+    def _size(self, data:DataLocation) -> int:
+        raise NOT_IMPLEMENTED
+
     def set_metadata(self, data:DataLocation, **metadata:str) -> None:
         raise NOT_IMPLEMENTED
 
