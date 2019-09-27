@@ -20,6 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 from abc import ABCMeta, abstractmethod
 
 from common import types as T
+from common.exceptions import NOT_IMPLEMENTED
 
 
 StateKey = T.Tuple[str, ...]
@@ -38,11 +39,8 @@ class State(T.MutableMapping[StateKey, StateValue], metaclass=ABCMeta):
     constraints are NOT imposed by this type.
 
     Implementations required:
-    * fetch    :: StateKey -> StateValue
-    * set      :: StateKey x StateValue -> None
-    * delete   :: StateKey -> None
-    * __iter__ :: () -> Iterator[StateKey]
-    * __len__  :: () -> int
+    * fetch :: StateKey -> StateValue
+    * set   :: StateKey x StateValue -> None
     """
     @abstractmethod
     def fetch(self, key:StateKey) -> StateValue:
@@ -52,10 +50,6 @@ class State(T.MutableMapping[StateKey, StateValue], metaclass=ABCMeta):
     def set(self, key:StateKey, value:StateValue) -> None:
         """ Set state key to value """
 
-    @abstractmethod
-    def delete(self, key:StateKey) -> None:
-        """ Delete state by key """
-
     def __getitem__(self, key:StateKey) -> StateValue:
         return self.fetch(key)
 
@@ -63,4 +57,19 @@ class State(T.MutableMapping[StateKey, StateValue], metaclass=ABCMeta):
         return self.set(key, value)
 
     def __delitem__(self, key:StateKey) -> None:
-        return self.delete(key)
+        # The MutableMapping interface is convenient, but nothing will
+        # be deleted from our database
+        # FIXME? Is this true? In a single run, this will be true, but
+        # if multiple runs use the same database, it seems reasonable to
+        # be able to clear out older, redundant state...
+        raise NOT_IMPLEMENTED
+
+    def __iter__(self) -> T.Iterator[StateKey]:
+        # The MutableMapping interface is convenient, but it makes no
+        # sense to iterate over it in our context
+        raise NOT_IMPLEMENTED
+
+    def __len__(self) -> int:
+        # The MutableMapping interface is convenient, but it makes no
+        # sense to count its elements in our context
+        raise NOT_IMPLEMENTED
