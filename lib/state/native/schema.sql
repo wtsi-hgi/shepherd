@@ -99,65 +99,55 @@ create index if not exists attempts_attempt on attempts(task, attempt);
 create index if not exists attempts_succeeded on attempts(task, attempt, exit_code) where exit_code = 0;
 create index if not exists attempts_failed on attempts(task, attempt, exit_code) where exit_code is not null and exit_code != 0;
 
--- TODO Use recursive CTEs?
 create view if not exists to_transfer as
-  with failed as (
-    select   attempts.task,
-             count(attempts.attempt) as attempts
-    from     attempts
-    where    attempts.exit_code is not null
-    and      attempts.exit_code != 0
-    group by attempts.task
-  ),
-  succeeded as (
-    select   attempts.task,
-             count(attempts.attempt) as attempts
-    from     attempts
-    where    attempts.exit_code = 0
-    group by attempts.task
-  ),
-  todo as (
-    select    failed.task as task,
-              failed.attempts
-    from      failed
-    left join succeeded
-    on        succeeded.task      = failed.task
-    and       succeeded.attempts >= failed.attempts
-    where     succeeded.task is null
+  with status as (
+    select    latest.task,
+              latest.attempt,
+              latest.exit_code
+    from      attempts as latest
+    left join attempts as later
+    on        later.task    = latest.task
+    and       later.attempt > latest.attempt
+    where     later.task   is null
 
     union all
 
+    -- Unattempted tasks are denoted as "failed"
     select    tasks.id as task,
-              0 as attempts
+              0        as attempt,
+              1        as exit_code
     from      tasks
     left join attempts
-    on        attempts.task = tasks.id
+    on        attempts.task  = tasks.id
     where     attempts.task is null
   )
-  select    ready.task,
+  select    tasks.id as task,
             tasks.job,
             source.filesystem as source_filesystem,
-            source.address   as source_location,
+            source.address    as source_address,
             target.filesystem as target_filesystem,
-            target.address   as target_location,
+            target.address    as target_address,
             tasks.script
-  from      todo as ready
+  from      status
   join      tasks
-  on        tasks.id = ready.task
-  left join succeeded
-  on        succeeded.task = tasks.dependency
-  join      jobs
-  on        jobs.id = tasks.job
+  on        tasks.id = status.task
+  left join status as dependency
+  on        dependency.task = tasks.dependency
   join      data as source
   on        source.id = tasks.source
   join      data as target
   on        target.id = tasks.target
-  where     (tasks.dependency is null or succeeded.task is not null)
-  and       ready.attempts < jobs.max_attempts;
+  join      jobs
+  on        jobs.id = tasks.job
+  where     status.exit_code is not null
+  and       status.exit_code != 0
+  and       (tasks.dependency is null or dependency.exit_code = 0)
+  and       status.attempt < jobs.max_attempts;
 
 commit;
 
 -- Testing
+-- TODO Remove this from here and put it into general testing
 begin exclusive transaction;
 
 insert into jobs(max_attempts, max_concurrency) values (3, 10);
@@ -186,7 +176,7 @@ update attempts set exit_code=1 where task = 1;
 select * from to_transfer;
 
 .print # Test 4
--- Expected: 2|1|xyzzy|bar|xyzzy|quux|abc
+-- Expected: 2|1|xyzzy|bar|xyzzy|quux|123abc
 insert into attempts(task, attempt, exit_code) values (1, 2, 0);
 select * from to_transfer;
 
