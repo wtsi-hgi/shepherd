@@ -101,6 +101,7 @@ create index if not exists attempts_task on attempts(task);
 create index if not exists attempts_attempt on attempts(task, attempt);
 create index if not exists attempts_succeeded on attempts(task, attempt, exit_code) where exit_code = 0;
 create index if not exists attempts_failed on attempts(task, attempt, exit_code) where exit_code is not null and exit_code != 0;
+create index if not exists attempts_running on attempts(task, attempt, exit_code) where exit_code is null;
 
 create view if not exists task_status as
   select    latest.task,
@@ -148,60 +149,16 @@ create view if not exists todo as
   and       (tasks.dependency is null or dependency.exit_code = 0)
   and       task_status.attempt < jobs.max_attempts;
 
+-- Fail any tasks that are in a running state upon initialisation
+with previously_running as (
+  select task,
+         attempt
+  from   task_status
+  where  exit_code is null
+)
+update attempts
+set    finish    = strftime('%s', 'now'),
+       exit_code = 1
+where  (task, attempt) in (select task, attempt from previously_running);
+
 commit;
-
--- Testing
--- TODO Remove this from here and put it into general testing
-begin exclusive transaction;
-
-insert into jobs(max_attempts, max_concurrency) values (3, 10);
-
-insert into data(filesystem, address) values
-  ("xyzzy", "foo"),
-  ("xyzzy", "bar"),
-  ("xyzzy", "quux");
-
-insert into tasks(job, source, target, script, dependency) values
-  (1, 1, 2, "abc123", null),
-  (1, 2, 3, "123abc", 1);
-
-.print # Test 1
--- Expected: 1|1|xyzzy|foo|xyzzy|bar|abc123
-select * from todo;
-
-.print # Test 2
--- Expected: <nothing>
-insert into attempts(task, attempt) values (1, 1);
-select * from todo;
-
-.print # Test 3
--- Expected: 1|1|xyzzy|foo|xyzzy|bar|abc123
-update attempts set exit_code=1 where task = 1;
-select * from todo;
-
-.print # Test 4
--- Expected: 2|1|xyzzy|bar|xyzzy|quux|123abc
-insert into attempts(task, attempt, exit_code) values (1, 2, 0);
-select * from todo;
-
-.print # Test 5
--- Expected: 1|1|xyzzy|foo|xyzzy|bar|abc123
-update attempts set exit_code = 1 where task = 1;
-select * from todo;
-
-.print # Test 6
--- Expected: <nothing>
-insert into attempts(task, attempt, exit_code) values (1, 3, 1);
-select * from todo;
-
-.print # Test 7
--- Expected: 2|1|xyzzy|bar|xyzzy|quux|123abc
-update attempts set exit_code = 0 where task = 1 and attempt = 3;
-select * from todo;
-
-.print # Test 8
--- Expected: <nothing>
-insert into attempts(task, attempt, exit_code) values (2, 1, 0);
-select * from todo;
-
-rollback;
