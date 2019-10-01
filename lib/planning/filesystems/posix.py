@@ -34,6 +34,9 @@ class POSIXFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for POSIX-like filesystems """
     _name = "POSIX"
 
+    def __init__(self, max_concurrency:int = 1) -> None:
+        self.max_concurrency = max_concurrency
+
     def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
         raise _NO_METADATA
 

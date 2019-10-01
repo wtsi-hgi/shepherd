@@ -26,6 +26,9 @@ class iRODSFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for iRODS filesystems """
     _name = "iRODS"
 
+    def __init__(self, max_concurrency:int = 10) -> None:
+        self.max_concurrency = max_concurrency
+
     def _accessible(self, data:DataLocation) -> bool:
         raise NOT_IMPLEMENTED
 

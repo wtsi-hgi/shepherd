@@ -79,13 +79,21 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     """
     # NOTE A Vertex is a Carrier; there's probably something useful that
     # we can put in its payload...
-
-    # TODO? This could be used as scheme, in the URI sense
-    _name:T.ClassVar[str]
+    _name:T.ClassVar[str]  # TODO? This could be used as URI scheme
+    _max_concurrency:int
 
     @property
     def name(self) -> str:
         return self.__class__._name
+
+    @property
+    def max_concurrency(self) -> int:
+        return self._max_concurrency
+
+    @max_concurrency.setter
+    def max_concurrency(self, value:int) -> None:
+        assert value > 0
+        self._max_concurrency = value
 
     @abstractmethod
     def _accessible(self, data:DataLocation) -> bool:
