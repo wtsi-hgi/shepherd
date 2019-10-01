@@ -86,7 +86,10 @@ create index if not exists tasks_job on tasks(job);
 
 create table if not exists attempts (
   task       integer  references tasks(id),
+
+  -- NOTE The attempt ID must be an ascending integer, starting from 1
   attempt    integer  not null,
+
   start      integer  not null default (strftime('%s', 'now')),
   finish     integer  check (finish is null or finish >= start),
   exit_code  integer  default (null),
@@ -99,28 +102,29 @@ create index if not exists attempts_attempt on attempts(task, attempt);
 create index if not exists attempts_succeeded on attempts(task, attempt, exit_code) where exit_code = 0;
 create index if not exists attempts_failed on attempts(task, attempt, exit_code) where exit_code is not null and exit_code != 0;
 
-create view if not exists to_transfer as
-  with status as (
-    select    latest.task,
-              latest.attempt,
-              latest.exit_code
-    from      attempts as latest
-    left join attempts as later
-    on        later.task    = latest.task
-    and       later.attempt > latest.attempt
-    where     later.task   is null
+create view if not exists task_status as
+  select    latest.task,
+            latest.attempt,
+            latest.exit_code
+  from      attempts as latest
+  left join attempts as later
+  on        later.task    = latest.task
+  and       later.attempt > latest.attempt
+  where     later.task   is null
 
-    union all
+  union all
 
-    -- Unattempted tasks are denoted as "failed"
-    select    tasks.id as task,
-              0        as attempt,
-              1        as exit_code
-    from      tasks
-    left join attempts
-    on        attempts.task  = tasks.id
-    where     attempts.task is null
-  )
+  -- NOTE Unattempted tasks are denoted as "failed"
+  select    tasks.id as task,
+            0        as attempt,
+            1        as exit_code
+  from      tasks
+  left join attempts
+  on        attempts.task  = tasks.id
+  where     attempts.task is null;
+
+-- Tasks ready to be actioned
+create view if not exists todo as
   select    tasks.id as task,
             tasks.job,
             source.filesystem as source_filesystem,
@@ -128,10 +132,10 @@ create view if not exists to_transfer as
             target.filesystem as target_filesystem,
             target.address    as target_address,
             tasks.script
-  from      status
+  from      task_status
   join      tasks
-  on        tasks.id = status.task
-  left join status as dependency
+  on        tasks.id = task_status.task
+  left join task_status as dependency
   on        dependency.task = tasks.dependency
   join      data as source
   on        source.id = tasks.source
@@ -139,10 +143,10 @@ create view if not exists to_transfer as
   on        target.id = tasks.target
   join      jobs
   on        jobs.id = tasks.job
-  where     status.exit_code is not null
-  and       status.exit_code != 0
+  where     task_status.exit_code is not null
+  and       task_status.exit_code != 0
   and       (tasks.dependency is null or dependency.exit_code = 0)
-  and       status.attempt < jobs.max_attempts;
+  and       task_status.attempt < jobs.max_attempts;
 
 commit;
 
@@ -163,41 +167,41 @@ insert into tasks(job, source, target, script, dependency) values
 
 .print # Test 1
 -- Expected: 1|1|xyzzy|foo|xyzzy|bar|abc123
-select * from to_transfer;
+select * from todo;
 
 .print # Test 2
 -- Expected: <nothing>
 insert into attempts(task, attempt) values (1, 1);
-select * from to_transfer;
+select * from todo;
 
 .print # Test 3
 -- Expected: 1|1|xyzzy|foo|xyzzy|bar|abc123
 update attempts set exit_code=1 where task = 1;
-select * from to_transfer;
+select * from todo;
 
 .print # Test 4
 -- Expected: 2|1|xyzzy|bar|xyzzy|quux|123abc
 insert into attempts(task, attempt, exit_code) values (1, 2, 0);
-select * from to_transfer;
+select * from todo;
 
 .print # Test 5
 -- Expected: 1|1|xyzzy|foo|xyzzy|bar|abc123
 update attempts set exit_code = 1 where task = 1;
-select * from to_transfer;
+select * from todo;
 
 .print # Test 6
 -- Expected: <nothing>
 insert into attempts(task, attempt, exit_code) values (1, 3, 1);
-select * from to_transfer;
+select * from todo;
 
 .print # Test 7
 -- Expected: 2|1|xyzzy|bar|xyzzy|quux|123abc
 update attempts set exit_code = 0 where task = 1 and attempt = 3;
-select * from to_transfer;
+select * from todo;
 
 .print # Test 8
 -- Expected: <nothing>
 insert into attempts(task, attempt, exit_code) values (2, 1, 0);
-select * from to_transfer;
+select * from todo;
 
 rollback;
