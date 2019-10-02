@@ -57,6 +57,9 @@ cat >&2 <<-EOF
 	## Run Time: ${runtime} seconds
 	#### END TELEMETRY #####################################################
 	EOF
+
+# Thread exit status through
+exit "${exit_status}"
 """)
 
 
