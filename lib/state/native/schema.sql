@@ -149,16 +149,4 @@ create view if not exists todo as
   and       (tasks.dependency is null or dependency.exit_code = 0)
   and       task_status.attempt < jobs.max_attempts;
 
--- Fail any tasks that are in a running state upon initialisation
-with previously_running as (
-  select task,
-         attempt
-  from   task_status
-  where  exit_code is null
-)
-update attempts
-set    finish    = strftime('%s', 'now'),
-       exit_code = 1
-where  (task, attempt) in (select task, attempt from previously_running);
-
 commit;
