@@ -24,12 +24,18 @@ begin exclusive transaction;
 create table if not exists jobs (
   id               integer  primary key,
   start            integer  not null default (strftime('%s', 'now')),
-  finish           integer  check (finish is null or finish >= start),
-  max_attempts     integer  not null check (max_attempts > 0),
-  max_concurrency  integer  not null check (max_concurrency > 0)
+  finish           integer  check (finish is null or finish >= start)
 );
 
 create index if not exists jobs_id on jobs(id);
+
+create table if not exists job_parameters (
+  job              integer  primary key references jobs(id),
+  max_attempts     integer  not null check (max_attempts > 0),
+  max_concurrency  integer  not null check (max_concurrency > 0)
+) without rowid;
+
+create index if not exists job_params_job on job_parameters(job);
 
 create table if not exists data (
   id          integer  primary key,
@@ -144,9 +150,12 @@ create view if not exists todo as
   on        target.id = tasks.target
   join      jobs
   on        jobs.id = tasks.job
-  where     task_status.exit_code is not null
+  join      job_parameters
+  on        job_parameters.job = jobs.id
+  where     jobs.finish is not null
+  and       task_status.exit_code is not null
   and       task_status.exit_code != 0
   and       (tasks.dependency is null or dependency.exit_code = 0)
-  and       task_status.attempt < jobs.max_attempts;
+  and       task_status.attempt < job_parameters.max_attempts;
 
 commit;

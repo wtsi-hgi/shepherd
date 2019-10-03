@@ -40,10 +40,12 @@ class HackityHackHack:
         if job is None:
             # Create new job
             with self._db as conn:
-                cur = conn.execute(
-                    "insert into jobs(max_attempts, max_concurrency) values (?, ?)",
-                    (3, 10))
+                cur = conn.execute("insert into jobs default values")
                 job = cur.lastrowid
+
+                cur = conn.execute(
+                    "insert into job_parameters(job, max_attempts, max_concurrency) values (?, ?, ?)",
+                    (job, 3, 10))
 
         self._job = job
 
