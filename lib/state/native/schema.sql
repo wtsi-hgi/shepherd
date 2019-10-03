@@ -152,7 +152,7 @@ create view if not exists todo as
   on        jobs.id = tasks.job
   join      job_parameters
   on        job_parameters.job = jobs.id
-  where     jobs.finish is not null
+  where     jobs.finish is null
   and       task_status.exit_code is not null
   and       task_status.exit_code != 0
   and       (tasks.dependency is null or dependency.exit_code = 0)
