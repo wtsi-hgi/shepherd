@@ -62,10 +62,10 @@ class HackityHackHack:
 
         return data_id
 
-    def add_task(self, source, target, script, dependency = None):
+    def add_task(self, script, source, source_fs, target, target_fs, dependency = None):
         # FIXME Tight coupling
-        source_id = self.add_data(source.name, str(source))
-        target_id = self.add_data(target.name, str(target))
+        source_id = self.add_data(source_fs, source)
+        target_id = self.add_data(target_fs, target)
 
         with self._db as conn:
             cur = conn.execute(

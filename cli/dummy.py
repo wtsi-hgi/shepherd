@@ -42,6 +42,6 @@ def main(*args:str) -> None:
     transfer += telemetry
 
     files = lustre._identify_by_fofn(T.Path(fofn))
-    for script, source, target in transfer.plan(files):
-        task_id = state.add_task(source, target, script)
-        print(f"Task {task_id}: {source} to {target}")
+    for script, tags in transfer.plan(files):
+        task_id = state.add_task(script, **tags.mapping)
+        print(f"Task {task_id}: {tags.source} to {tags.target}")

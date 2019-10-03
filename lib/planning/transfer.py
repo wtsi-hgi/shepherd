@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from copy import copy
+from dataclasses import asdict, dataclass
 from functools import singledispatch
 
 from common import types as T
@@ -38,8 +39,21 @@ DataLocation = T.Path
 DataGenerator = T.Iterable[DataLocation]
 IOGenerator = T.Iterable[T.Tuple[DataLocation, DataLocation]]
 
-# Generator of triples: script, source location, target location
-TransferGenerator = T.Iterable[T.Tuple[str, DataLocation, DataLocation]]
+@dataclass
+class RenderTags:
+    """ Tags used to render the transfer script """
+    source_fs:str        # Source filesystem
+    source:DataLocation  # Source location
+
+    target_fs:str        # Target filesystem
+    target:DataLocation  # Target location
+
+    @property
+    def mapping(self) -> T.Dict[str, str]:
+        return {k: str(v) for k, v in asdict(self).items()}
+
+# Generator of tuples: rendered script, render tags
+TransferGenerator = T.Iterable[T.Tuple[str, RenderTags]]
 
 
 class UnsupportedByFilesystem(BaseException):
@@ -347,10 +361,10 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         this class MUST define a template named "script", in which you
         may use the following variables:
 
-        * from    Source filesystem
-        * source  Source location
-        * to      Target filesystem
-        * target  Target filesystem
+        * source_fs  Source filesystem
+        * source     Source location
+        * target_fs  Target filesystem
+        * target     Target filesystem
         """
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates
@@ -421,13 +435,11 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         io_transformer = self.get_transform(RouteIOTransformation)
 
         for source, target in io_transformer(io_generator):
-            tags = {
-                "from":   self.source.name,  # Source filesystem
-                "source": str(source),       # Source location
+            tags = RenderTags(
+                source_fs = self.source.name,
+                source    = source,
+                target_fs = self.target.name,
+                target    = target)
 
-                "to":     self.target.name,  # Target filesystem
-                "target": str(target),       # Target location
-            }
-
-            rendered = self._templating.render("transfer", **tags)
-            yield rendered, source, target
+            rendered = self._templating.render("transfer", **tags.mapping)
+            yield rendered, tags
