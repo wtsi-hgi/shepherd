@@ -24,9 +24,8 @@ from ..transfer import FilesystemVertex, DataLocation, DataGenerator
 # TODO Obviously... :P
 class iRODSFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for iRODS filesystems """
-    _name = "iRODS"
-
-    def __init__(self, max_concurrency:int = 10) -> None:
+    def __init__(self, *, name:str = "iRODS", max_concurrency:int = 10) -> None:
+        self._name = name
         self.max_concurrency = max_concurrency
 
     def _accessible(self, data:DataLocation) -> bool:

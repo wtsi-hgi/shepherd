@@ -32,16 +32,16 @@ def main(*args:str) -> None:
     state = HackityHackHack(state_root)
     print(f"Job ID: {state.job}")
 
-    posix = POSIXFilesystem()
+    lustre = POSIXFilesystem(name="Lustre", max_concurrency=50)
     irods = iRODSFilesystem()
-    transfer = posix_to_irods_factory(posix, irods)
+    transfer = posix_to_irods_factory(lustre, irods)
     transfer += strip_common_prefix
     transfer += prefix(DataLocation("/here/is/a/prefix"))
-    transfer += last_n_components(3)
+    transfer += last_n_components(4)
     transfer += debugging
     transfer += telemetry
 
-    files = posix._identify_by_fofn(T.Path(fofn))
+    files = lustre._identify_by_fofn(T.Path(fofn))
     for script, source, target in transfer.plan(files):
         task_id = state.add_task(source, target, script)
         print(f"Task {task_id}: {source} to {target}")

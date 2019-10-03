@@ -79,12 +79,13 @@ class FilesystemVertex(Vertex, metaclass=ABCMeta):
     """
     # NOTE A Vertex is a Carrier; there's probably something useful that
     # we can put in its payload...
-    _name:T.ClassVar[str]  # TODO? This could be used as URI scheme
+    _name:str
     _max_concurrency:int
 
     @property
     def name(self) -> str:
-        return self.__class__._name
+        # This should be read-only, set in the constructor
+        return self._name
 
     @property
     def max_concurrency(self) -> int:
