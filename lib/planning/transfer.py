@@ -364,7 +364,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         * source_fs  Source filesystem
         * source     Source location
         * target_fs  Target filesystem
-        * target     Target filesystem
+        * target     Target location
         """
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates

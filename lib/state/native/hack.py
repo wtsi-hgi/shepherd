@@ -24,7 +24,7 @@ def create_root(parent = None):
 
 
 class HackityHackHack:
-    def __init__(self, root, job = None):
+    def __init__(self, root, job = None, max_attempts = 3):
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._root = root
         db = root / _STATE_DB
@@ -45,13 +45,31 @@ class HackityHackHack:
 
                 cur = conn.execute(
                     "insert into job_parameters(job, max_attempts, max_concurrency) values (?, ?, ?)",
-                    (job, 3, 10))
+                    (job, max_attempts, 1))
 
         self._job = job
 
     @property
     def job(self):
         return self._job
+
+    @property
+    def max_concurrency(self):
+        with self._db as conn:
+            max_concurrency, = conn.execute(
+                "select max_concurrency from job_parameters where job = ?",
+                (self.job,)).fetchone()
+
+        return max_concurrency
+
+    @max_concurrency.setter
+    def max_concurrency(self, value):
+        assert value > 0
+
+        with self._db as conn:
+            conn.execute(
+                "update job_parameters set max_concurrency = ? where job = ?",
+                (value, self.job))
 
     def add_data(self, filesystem, address):
         with self._db as conn:

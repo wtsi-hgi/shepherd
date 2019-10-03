@@ -27,11 +27,6 @@ from lib.state.native.hack import HackityHackHack, create_root
 def main(*args:str) -> None:
     fofn, *_ = args
 
-    state_root = create_root(T.Path("."))
-    print(f"State: {state_root}")
-    state = HackityHackHack(state_root)
-    print(f"Job ID: {state.job}")
-
     lustre = POSIXFilesystem(name="Lustre", max_concurrency=50)
     irods = iRODSFilesystem()
     transfer = posix_to_irods_factory(lustre, irods)
@@ -40,6 +35,14 @@ def main(*args:str) -> None:
     transfer += last_n_components(4)
     transfer += debugging
     transfer += telemetry
+
+    state_root = create_root(T.Path("."))
+    state = HackityHackHack(state_root)
+    state.max_concurrency = min(lustre.max_concurrency, irods.max_concurrency)
+
+    print(f"State: {state_root}")
+    print(f"Job ID: {state.job}")
+    print(f"Max. Concurrency: {state.max_concurrency}")
 
     files = lustre._identify_by_fofn(T.Path(fofn))
     for script, tags in transfer.plan(files):
