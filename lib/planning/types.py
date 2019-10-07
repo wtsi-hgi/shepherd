@@ -252,7 +252,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         # applying filters to the "target" variable), or by an I/O route
         # transformation, the target location is assumed to be identical
         # to the source location
-        io_generator = ((source, source) for source in data)
+        io_generator = ((source, Data(self.target, source.address)) for source in data)
         io_transformer = self.get_transform(RouteIOTransformation)
 
         for source, target in io_transformer(io_generator):
