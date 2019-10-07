@@ -29,7 +29,7 @@ from functools import singledispatch
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from common.templating import Templating
-from .graph import Vertex, Cost, CostBearing, Edge
+from models.graph import Vertex, Cost, CostBearing, Edge
 
 
 # FIXME We are using Path throughout, for now. It would be more
