@@ -25,8 +25,8 @@ from abc import ABCMeta, abstractmethod
 from copy import copy
 from functools import total_ordering
 
-from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
+from .. import types as T
+from ..exceptions import NOT_IMPLEMENTED
 
 
 # FIXME Some (all?) of these types need to be declared as co- or

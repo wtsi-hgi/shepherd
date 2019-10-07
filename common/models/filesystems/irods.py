@@ -17,18 +17,14 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
-from models.filesystem import DataGenerator
-from ..transfer import FilesystemVertex
+from ... import types as T
+from ...exceptions import NOT_IMPLEMENTED
+from .types import DataGenerator, Filesystem
 
 
 # TODO Obviously... :P
-class iRODSFilesystem(FilesystemVertex):
-    """ Filesystem vertex implementation for iRODS filesystems """
-    # TODO While it's trivial, we should separate out the Filesystem and
-    # FilesystemVertex definitions. In fact, perhaps the Filesystem
-    # implementations should be common models...
+class iRODSFilesystem(Filesystem):
+    """ Filesystem implementation for iRODS filesystems """
     def __init__(self, *, name:str = "iRODS", max_concurrency:int = 10) -> None:
         self._name = name
         self.max_concurrency = max_concurrency

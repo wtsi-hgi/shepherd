@@ -27,8 +27,8 @@ from functools import singledispatch
 
 from common import types as T
 from common.templating import Templating
-from models.graph import Vertex, Cost, CostBearing, Edge
-from models.filesystem import Data, DataGenerator, Filesystem
+from common.models.graph import Vertex, Cost, CostBearing, Edge
+from common.models.filesystems.types import Data, DataGenerator, Filesystem
 
 
 IOGenerator = T.Iterable[T.Tuple[Data, Data]]
@@ -49,8 +49,15 @@ On  = PolynomialComplexity(1)  # Linear time
 On2 = PolynomialComplexity(2)  # Quadratic time
 
 
-class FilesystemVertex(Filesystem, Vertex, metaclass=ABCMeta):
-    """ Filesystem vertex abstract base class """
+class FilesystemVertex(Vertex):
+    """ Filesystem vertex """
+    def __init__(self, filesystem:Filesystem) -> None:
+        self.payload = filesystem
+
+    @property
+    def filesystem(self) -> Filesystem:
+        # Convenience alias
+        return self.payload
 
 
 class RouteTransformation(CostBearing, metaclass=ABCMeta):
@@ -197,14 +204,14 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         self.plan.register(str, self._plan_by_query)
 
     @property
-    def source(self) -> FilesystemVertex:
+    def source(self) -> Filesystem:
         # Convenience alias
-        return self.a
+        return self.a.filesystem
 
     @property
-    def target(self) -> FilesystemVertex:
+    def target(self) -> Filesystem:
         # Convenience alias
-        return self.b
+        return self.b.filesystem
 
     def __iadd__(self, transform:RouteTransformation) -> TransferRoute:
         """ Add a transformation to the route """

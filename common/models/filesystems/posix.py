@@ -21,21 +21,17 @@ import gzip
 import hashlib
 import os
 
-from common import types as T
-from common.constants import BLOCKSIZE
-from common.exceptions import NOT_IMPLEMENTED
-from models.filesystem import Data, DataGenerator, UnsupportedByFilesystem
-from ..transfer import FilesystemVertex
+from ... import types as T
+from ...constants import BLOCKSIZE
+from ...exceptions import NOT_IMPLEMENTED
+from .types import Data, DataGenerator, Filesystem, UnsupportedByFilesystem
 
 
 _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-value metadata")
 
 
-class POSIXFilesystem(FilesystemVertex):
-    """ Filesystem vertex implementation for POSIX-like filesystems """
-    # TODO While it's trivial, we should separate out the Filesystem and
-    # FilesystemVertex definitions. In fact, perhaps the Filesystem
-    # implementations should be common models...
+class POSIXFilesystem(Filesystem):
+    """ Filesystem implementation for POSIX-like filesystems """
     def __init__(self, *, name:str = "POSIX", max_concurrency:int = 1) -> None:
         self._name = name
         self.max_concurrency = max_concurrency
@@ -57,7 +53,7 @@ class POSIXFilesystem(FilesystemVertex):
         raise NOT_IMPLEMENTED
 
     def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
-        opener = open if not compressed else gzip.open
+        opener = gzip.open if compressed else open
 
         with opener(fofn, mode="rt") as f:
             last = ""

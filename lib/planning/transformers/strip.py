@@ -20,8 +20,8 @@ with this program. If not, see https://www.gnu.org/licenses/
 from os.path import commonpath
 
 from common import types as T
-from models.filesystem import Data
-from ..transfer import RouteIOTransformation, IOGenerator
+from common.models.filesystems.types import Data
+from ..types import RouteIOTransformation, IOGenerator
 
 
 _ROOT = T.Path("/")

@@ -24,8 +24,8 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 
-from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
+from ... import types as T
+from ...exceptions import NOT_IMPLEMENTED
 
 
 class UnsupportedByFilesystem(BaseException):
