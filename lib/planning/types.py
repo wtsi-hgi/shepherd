@@ -26,9 +26,9 @@ from copy import copy
 from functools import singledispatch
 
 from common import types as T
-from common.templating import Templating
-from common.models.graph import Vertex, Cost, CostBearing, Edge
-from common.models.filesystems.types import Data, DataGenerator, Filesystem
+from common.templating import BaseTemplating
+from common.models.graph import Vertex, BaseCost, CostBearing, Edge
+from common.models.filesystems.types import Data, DataGenerator, BaseFilesystem
 
 
 IOGenerator = T.Iterable[T.Tuple[Data, Data]]
@@ -37,7 +37,7 @@ IOGenerator = T.Iterable[T.Tuple[Data, Data]]
 TransferGenerator = T.Iterable[T.Tuple[str, Data, Data]]
 
 
-class PolynomialComplexity(Cost):
+class PolynomialComplexity(BaseCost):
     """ Edge cost representing polynomial time complexity """
     # NOTE The k in O(n^k)
     def __add__(self, rhs:PolynomialComplexity) -> PolynomialComplexity:
@@ -51,35 +51,35 @@ On2 = PolynomialComplexity(2)  # Quadratic time
 
 class FilesystemVertex(Vertex):
     """ Filesystem vertex """
-    def __init__(self, filesystem:Filesystem) -> None:
+    def __init__(self, filesystem:BaseFilesystem) -> None:
         self.payload = filesystem
 
     @property
-    def filesystem(self) -> Filesystem:
+    def filesystem(self) -> BaseFilesystem:
         # Convenience alias
         return self.payload
 
 
-class RouteTransformation(CostBearing, metaclass=ABCMeta):
+class BaseRouteTransformation(CostBearing, metaclass=ABCMeta):
     """
     Route transformation abstract base class
 
     Implementations required:
     __call__ :: <arbitrary> -> <arbitrary>
-    __add__  :: RouteTransformation -> RouteTransformation
+    __add__  :: BaseRouteTransformation -> BaseRouteTransformation
     """
     @abstractmethod
     def __call__(self, *args:T.Any, **kwargs:T.Any) -> T.Any:
         """ Interface for how the transformation is invoked """
 
     @abstractmethod
-    def __add__(self, rhs:RouteTransformation) -> RouteTransformation:
+    def __add__(self, rhs:BaseRouteTransformation) -> BaseRouteTransformation:
         """ Interface for how transformations should be combined """
 
 
 IOTransformer = T.Callable[[IOGenerator], IOGenerator]
 
-class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
+class RouteIOTransformation(T.Carrier[IOTransformer], BaseRouteTransformation):
     """ Transform the I/O stream """
     def __init__(self, transformer:IOTransformer, cost:PolynomialComplexity = On) -> None:
         self.payload = transformer
@@ -97,7 +97,7 @@ class RouteIOTransformation(T.Carrier[IOTransformer], RouteTransformation):
         return RouteIOTransformation(composition, self.cost + rhs.cost)
 
 
-class RouteScriptTransformation(T.Carrier[Templating], RouteTransformation):
+class RouteScriptTransformation(T.Carrier[BaseTemplating], BaseRouteTransformation):
     """
     Transform the transfer script
 
@@ -119,7 +119,7 @@ class RouteScriptTransformation(T.Carrier[Templating], RouteTransformation):
         echo "Completed transfer to {{ target }}"
 
     """
-    def __init__(self, templating:Templating, cost:PolynomialComplexity = O1) -> None:
+    def __init__(self, templating:BaseTemplating, cost:PolynomialComplexity = O1) -> None:
         # TODO Subclass this, rather than relying on runtime checks
         assert "wrapper" in templating.templates
         self.payload = templating
@@ -168,11 +168,11 @@ _zeros = {
 }
 
 
-class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
+class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
     """ Data transfer route """
-    _templating:Templating
+    _templating:BaseTemplating
 
-    def __init__(self, source:FilesystemVertex, target:FilesystemVertex, *, templating:Templating, cost:PolynomialComplexity = On) -> None:
+    def __init__(self, source:FilesystemVertex, target:FilesystemVertex, *, templating:BaseTemplating, cost:PolynomialComplexity = On) -> None:
         """
         @param  source      Source filesystem vertex
         @param  target      Target filesystem vertex
@@ -204,22 +204,22 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         self.plan.register(str, self._plan_by_query)
 
     @property
-    def source(self) -> Filesystem:
+    def source(self) -> BaseFilesystem:
         # Convenience alias
         return self.a.filesystem
 
     @property
-    def target(self) -> Filesystem:
+    def target(self) -> BaseFilesystem:
         # Convenience alias
         return self.b.filesystem
 
-    def __iadd__(self, transform:RouteTransformation) -> TransferRoute:
+    def __iadd__(self, transform:BaseRouteTransformation) -> TransferRoute:
         """ Add a transformation to the route """
         self._payload.append(transform)
         self.cost += transform.cost
         return self
 
-    def get_transform(self, transform_type:T.Type[RouteTransformation]) -> RouteTransformation:
+    def get_transform(self, transform_type:T.Type[BaseRouteTransformation]) -> BaseRouteTransformation:
         """ Filter the transforms by type and compose """
         transformers = (t for t in self.payload if isinstance(t, transform_type))
         return sum(transformers, _zeros[transform_type])

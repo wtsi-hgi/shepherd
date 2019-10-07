@@ -32,7 +32,7 @@ class TemplatingError(BaseException):
 Filter = T.Callable[..., str]
 
 
-class Templating(metaclass=ABCMeta):
+class BaseTemplating(metaclass=ABCMeta):
     """
     Templating engine base class
 
@@ -71,7 +71,7 @@ class Templating(metaclass=ABCMeta):
         """ Render a specific template with the given tags """
 
 
-class Jinja2Templating(Templating):
+class Jinja2Templating(BaseTemplating):
     """ Jinja2-based templating engine """
     _env:Environment
     _templates:T.Dict[str, T.Tuple[str, Template]]
@@ -106,7 +106,7 @@ class Jinja2Templating(Templating):
         return template.render(**tags)
 
 
-def templating_factory(cls:T.Type[Templating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None, **cls_kwargs:T.Any) -> Templating:
+def templating_factory(cls:T.Type[BaseTemplating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None, **cls_kwargs:T.Any) -> BaseTemplating:
     """
     Create Templating engine with given filters and templates
 

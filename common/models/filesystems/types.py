@@ -47,7 +47,7 @@ class Data:
 DataGenerator = T.Iterable[Data]
 
 
-class Filesystem(metaclass=ABCMeta):
+class BaseFilesystem(metaclass=ABCMeta):
     """
     Filesystem abstract base class
 

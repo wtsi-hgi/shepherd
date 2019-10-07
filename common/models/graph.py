@@ -41,29 +41,29 @@ class NoRouteFound(BaseException):
     """ Raised when no route can be found matching the itinerary """
 
 
-class Vertex(T.Carrier[T.Any], metaclass=ABCMeta):
-    """ Vertex abstract base class """
+class Vertex(T.Carrier[T.Any]):
+    """ Vertex class """
 
 
 @total_ordering
-class Cost(T.Carrier[T.Number], metaclass=ABCMeta):
+class BaseCost(T.Carrier[T.Number], metaclass=ABCMeta):
     """
     Edge cost abstract base class
 
     Implementations required:
-    * __add__ :: Cost -> Cost
+    * __add__ :: BaseCost -> BaseCost
     """
     def __init__(self, cost:T.Number) -> None:
         self.payload = cost
 
-    def __eq__(self, rhs:Cost) -> bool:
+    def __eq__(self, rhs:BaseCost) -> bool:
         return self.payload == rhs.payload
 
-    def __lt__(self, rhs:Cost) -> bool:
+    def __lt__(self, rhs:BaseCost) -> bool:
         return self.payload < rhs.payload
 
     @abstractmethod
-    def __add__(self, rhs:Cost) -> Cost:
+    def __add__(self, rhs:BaseCost) -> BaseCost:
         """ Define how edge costs should be summed """
 
     @property
@@ -74,19 +74,19 @@ class Cost(T.Carrier[T.Number], metaclass=ABCMeta):
 
 class CostBearing:
     """ Mixin for classes that incur a cost upon graph traversal """
-    _cost:Cost
+    _cost:BaseCost
 
     @property
-    def cost(self) -> Cost:
+    def cost(self) -> BaseCost:
         return self._cost
 
     @cost.setter
-    def cost(self, value:Cost) -> None:
+    def cost(self, value:BaseCost) -> None:
         self._cost = value
 
 
-class Edge(T.Carrier[T.Any], T.Container[Vertex], CostBearing, metaclass=ABCMeta):
-    """ Edge abstract base class """
+class Edge(T.Carrier[T.Any], T.Container[Vertex], CostBearing):
+    """ Edge class """
     _vertices:T.Tuple[Vertex, Vertex]
     _directed:bool
 

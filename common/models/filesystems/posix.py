@@ -24,13 +24,13 @@ import os
 from ... import types as T
 from ...constants import BLOCKSIZE
 from ...exceptions import NOT_IMPLEMENTED
-from .types import Data, DataGenerator, Filesystem, UnsupportedByFilesystem
+from .types import Data, DataGenerator, BaseFilesystem, UnsupportedByFilesystem
 
 
 _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-value metadata")
 
 
-class POSIXFilesystem(Filesystem):
+class POSIXFilesystem(BaseFilesystem):
     """ Filesystem implementation for POSIX-like filesystems """
     def __init__(self, *, name:str = "POSIX", max_concurrency:int = 1) -> None:
         self._name = name

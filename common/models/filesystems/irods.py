@@ -19,11 +19,11 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from ... import types as T
 from ...exceptions import NOT_IMPLEMENTED
-from .types import DataGenerator, Filesystem
+from .types import DataGenerator, BaseFilesystem
 
 
 # TODO Obviously... :P
-class iRODSFilesystem(Filesystem):
+class iRODSFilesystem(BaseFilesystem):
     """ Filesystem implementation for iRODS filesystems """
     def __init__(self, *, name:str = "iRODS", max_concurrency:int = 10) -> None:
         self._name = name
