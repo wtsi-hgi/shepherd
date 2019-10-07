@@ -19,42 +19,47 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
-from ..transfer import FilesystemVertex, DataLocation, DataGenerator
+from models.filesystem import DataGenerator
+from ..transfer import FilesystemVertex
+
 
 # TODO Obviously... :P
 class iRODSFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for iRODS filesystems """
+    # TODO While it's trivial, we should separate out the Filesystem and
+    # FilesystemVertex definitions. In fact, perhaps the Filesystem
+    # implementations should be common models...
     def __init__(self, *, name:str = "iRODS", max_concurrency:int = 10) -> None:
         self._name = name
         self.max_concurrency = max_concurrency
 
-    def _accessible(self, data:DataLocation) -> bool:
+    def _accessible(self, address:T.Path) -> bool:
         raise NOT_IMPLEMENTED
 
     def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
         raise NOT_IMPLEMENTED
 
-    def _identify_by_stat(self, path:DataLocation, *, name:str = "*") -> DataGenerator:
+    def _identify_by_stat(self, address:T.Path, *, name:str = "*") -> DataGenerator:
         raise NOT_IMPLEMENTED
 
-    def _identify_by_fofn(self, fofn:DataLocation, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
+    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
         raise NOT_IMPLEMENTED
 
     @property
     def supported_checksums(self) -> T.List[str]:
         return ["md5"]
 
-    def _checksum(self, algorithm:str, data:DataLocation) -> str:
+    def _checksum(self, algorithm:str, address:T.Path) -> str:
         raise NOT_IMPLEMENTED
 
-    def _size(self, data:DataLocation) -> int:
+    def _size(self, address:T.Path) -> int:
         raise NOT_IMPLEMENTED
 
-    def set_metadata(self, data:DataLocation, **metadata:str) -> None:
+    def set_metadata(self, address:T.Path, **metadata:str) -> None:
         raise NOT_IMPLEMENTED
 
-    def delete_metadata(self, data:DataLocation, *keys:str) -> None:
+    def delete_metadata(self, address:T.Path, *keys:str) -> None:
         raise NOT_IMPLEMENTED
 
-    def delete_data(self, data:DataLocation) -> None:
+    def delete_data(self, address:T.Path) -> None:
         raise NOT_IMPLEMENTED

@@ -30,7 +30,7 @@ _sh_escape = re.compile(r"([\"$])")
 _filters:T.Dict[str, Filter] = {
     "dirname":   os.path.dirname,
     "basename":  os.path.basename,
-    "sh_escape": partial(_sh_escape.sub, r"\\\1")
+    "sh_escape": lambda x: _sh_escape.sub(r"\\\1", str(x))
     # TODO Any other useful filters...
 }
 

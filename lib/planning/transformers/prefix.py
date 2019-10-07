@@ -17,10 +17,12 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from ..transfer import RouteIOTransformation, DataLocation, IOGenerator
+from common import types as T
+from models.filesystem import Data
+from ..transfer import RouteIOTransformation, IOGenerator
 
 
-def prefix(prefix:DataLocation) -> RouteIOTransformation:
+def prefix(prefix:T.Path) -> RouteIOTransformation:
     """
     Route IO transformation factory that prefixes the target path with
     the given path
@@ -28,12 +30,14 @@ def prefix(prefix:DataLocation) -> RouteIOTransformation:
     @param   prefix  Data location to prefix
     @return  IO transformer
     """
-    # TODO This will need to change when DataLocation becomes more
-    # generic/URI based, rather than just a wrapper to pathlib.Path
     assert prefix.is_absolute()
 
     def _prefixer(io:IOGenerator) -> IOGenerator:
         for source, target in io:
-            yield source, prefix / target.relative_to(target.root)
+            new_target = Data(
+                filesystem = target.filesystem,
+                address    = prefix / target.address.relative_to(target.address.root))
+
+            yield source, new_target
 
     return RouteIOTransformation(_prefixer)

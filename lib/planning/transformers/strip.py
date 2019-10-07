@@ -17,33 +17,33 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from os import path
+from os.path import commonpath
 
 from common import types as T
-from ..transfer import RouteIOTransformation, DataLocation, IOGenerator
+from models.filesystem import Data
+from ..transfer import RouteIOTransformation, IOGenerator
 
 
-# FIXME? We assume absolute paths for the targets, but this isn't
-# necessarily true and would need to change when using something more
-# generic/URI based, rather than as a wrapper to pathlib.Path
-_ROOT = DataLocation("/")
+_ROOT = T.Path("/")
 
 
 def _strip_common_prefix(io:IOGenerator) -> IOGenerator:
     """ Strip the common prefix from all target locations """
-    # TODO This will need to change when DataLocation becomes more
-    # generic/URI based, rather than just a wrapper to pathlib.Path
-    _buffer:T.List[T.Tuple[DataLocation, DataLocation]] = []
-    _prefix:T.Optional[DataLocation] = None
+    _buffer:T.List[T.Tuple[Data, Data]] = []
+    _prefix:T.Optional[Data] = None
 
     for source, target in io:
         # We calculate the common prefix one location at a time, because
         # os.path.commonpath otherwise eats a lot of memory
         _buffer.append((source, target))
-        _prefix = DataLocation(path.commonpath((_prefix or target, target)))
+        _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
 
     for source, target in _buffer:
-        yield source, _ROOT / target.relative_to(_prefix)
+        new_target = Data(
+            filesystem = target.filesystem,
+            address    = _ROOT / target.address.relative_to(_prefix))
+
+        yield source, new_target
 
 strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
@@ -56,12 +56,14 @@ def last_n_components(n:int) -> RouteIOTransformation:
     @param   n  Number of components
     @return  IO transformer
     """
-    # TODO This will need to change when DataLocation becomes more
-    # generic/URI based, rather than just a wrapper to pathlib.Path
     assert n > 0
 
     def _last_n(io:IOGenerator) -> IOGenerator:
         for source, target in io:
-            yield source, _ROOT / DataLocation(*target.parts[-n:])
+            new_target = Data(
+                filesystem = target.filesystem,
+                address    = _ROOT / T.Path(*target.address.parts[-n:]))
+
+            yield source, new_target
 
     return RouteIOTransformation(_last_n)

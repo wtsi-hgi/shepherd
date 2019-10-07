@@ -23,44 +23,18 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from copy import copy
-from dataclasses import asdict, dataclass
 from functools import singledispatch
 
 from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
 from common.templating import Templating
 from models.graph import Vertex, Cost, CostBearing, Edge
+from models.filesystem import Data, DataGenerator, Filesystem
 
 
-# FIXME We are using Path throughout, for now. It would be more
-# appropriate to use something like URI
-DataLocation = T.Path
+IOGenerator = T.Iterable[T.Tuple[Data, Data]]
 
-DataGenerator = T.Iterable[DataLocation]
-IOGenerator = T.Iterable[T.Tuple[DataLocation, DataLocation]]
-
-@dataclass
-class RenderTags:
-    """ Tags used to render the transfer script """
-    source_fs:str        # Source filesystem
-    source:DataLocation  # Source location
-
-    target_fs:str        # Target filesystem
-    target:DataLocation  # Target location
-
-    @property
-    def mapping(self) -> T.Dict[str, str]:
-        return {k: str(v) for k, v in asdict(self).items()}
-
-# Generator of tuples: rendered script, render tags
-TransferGenerator = T.Iterable[T.Tuple[str, RenderTags]]
-
-
-class UnsupportedByFilesystem(BaseException):
-    """ Raised when an unsupported action is attempted on a filesystem """
-
-class DataInaccessible(BaseException):
-    """ Raised when data cannot be accessed for whatever reason """
+# Generator of tuples: rendered script, source data, target data
+TransferGenerator = T.Iterable[T.Tuple[str, Data, Data]]
 
 
 class PolynomialComplexity(Cost):
@@ -75,167 +49,8 @@ On  = PolynomialComplexity(1)  # Linear time
 On2 = PolynomialComplexity(2)  # Quadratic time
 
 
-class FilesystemVertex(Vertex, metaclass=ABCMeta):
-    """
-    Filesystem vertex abstract base class
-
-    Implementations required:
-    * _accessible           :: DataLocation -> bool
-    * _identify_by_metadata :: DataLocation x kwargs -> Iterable[DataLocation]
-    * _identify_by_stat     :: DataLocation x (TODO) -> Iterable[DataLocation]
-    * _identify_by_fofn     :: DataLocation -> Iterable[DataLocation]
-    * supported_checksums   :: () -> List[str]
-    * _checksum             :: str x DataLocation -> str
-    * _size                 :: DataLocation -> int
-    * set_metadata          :: DataLocation x kwargs -> None
-    * delete_metadata       :: DataLocation x args -> None
-    * delete_data           :: DataLocation -> None
-    """
-    # NOTE A Vertex is a Carrier; there's probably something useful that
-    # we can put in its payload...
-    _name:str
-    _max_concurrency:int
-
-    @property
-    def name(self) -> str:
-        # This should be read-only, set in the constructor
-        return self._name
-
-    @property
-    def max_concurrency(self) -> int:
-        return self._max_concurrency
-
-    @max_concurrency.setter
-    def max_concurrency(self, value:int) -> None:
-        assert value > 0
-        self._max_concurrency = value
-
-    @abstractmethod
-    def _accessible(self, data:DataLocation) -> bool:
-        """
-        Check that a file exists and is readable
-
-        @param   data  File to check
-        @return  Predicate
-        """
-        # FIXME It's better to ask forgiveness than to seek permission;
-        # the model as described here is susceptible to security holes
-
-    @abstractmethod
-    def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
-        """
-        Identify data by the given set of key-value metadata
-
-        @param   metadata  Key-value pairs
-        @return  Iterator of matching paths
-        """
-
-    @abstractmethod
-    def _identify_by_stat(self, path:DataLocation, *, name:str = "*") -> DataGenerator:
-        """
-        Identify data by a combination of various stat metrics, similar
-        to the find(1) utility
-
-        @param   path  Search root path
-        @param   name  Filename, that can include glob patterns
-        @return  Iterator of matching paths
-        """
-        # TODO Flesh out parameters and interface
-
-    @abstractmethod
-    def _identify_by_fofn(self, fofn:DataLocation, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
-        """
-        Identify data by a file of filenames
-
-        @param   fofn        File of filenames
-        @param   delimiter   Record delimiter
-        @param   compressed  Is FoFN gzip-compressed
-        @return  Iterator of matching paths
-        """
-
-    def identify(self, query:str) -> DataGenerator:
-        """
-        Identify data based on the given query
-
-        @param   query  Search criteria
-        @return  Iterator of matching paths
-        """
-        # TODO Design and implement query language that ultimately calls
-        # the appropriate "_identify_by_*" method(s) and combines their
-        # results accordingly
-        raise NOT_IMPLEMENTED
-
-    @property
-    @abstractmethod
-    def supported_checksums(self) -> T.List[str]:
-        """
-        Checksums algorithms supported by the filesystem
-
-        @return  List of supported checksum algorithms
-        """
-
-    @abstractmethod
-    def _checksum(self, algorithm:str, data:DataLocation) -> str:
-        """ Checksum a file with the given algorithm """
-
-    def checksum(self, algorithm:str, data:DataLocation) -> str:
-        """
-        Checksum a file with the given algorithm
-
-        @param   algorithm  Checksum algorithm
-        @param   data       File to checksum
-        @return  Checksum of file
-        """
-        if algorithm not in self.supported_checksums:
-            raise UnsupportedByFilesystem(f"Filesystem does not support the {algorithm} checksum algorithm")
-
-        if not self._accessible(data):
-            raise DataInaccessible(f"Cannot access {data}")
-
-        return self._checksum(algorithm, data)
-
-    @abstractmethod
-    def _size(self, data:DataLocation) -> int:
-        """ Return the size of a file in bytes """
-
-    def size(self, data:DataLocation) -> int:
-        """
-        Return the size of a file in bytes
-
-        @param   data       File to checksum
-        @return  Checksum of file
-        """
-        if not self._accessible(data):
-            raise DataInaccessible(f"Cannot access {data}")
-
-        return self._size(data)
-
-    @abstractmethod
-    def set_metadata(self, data:DataLocation, **metadata:str) -> None:
-        """
-        Set (insert/update) key-value metadata for a given file
-
-        @param   data      File
-        @param   metadata  Key-value pairs
-        """
-
-    @abstractmethod
-    def delete_metadata(self, data:DataLocation, *keys:str) -> None:
-        """
-        Remove metadata, by key, from a given file
-
-        @param   data  File
-        @param   keys  Keys to delete
-        """
-        # FIXME Is this needed?
-
-    @abstractmethod
-    def delete_data(self, data:DataLocation) -> None:
-        """
-        Delete data from filesystem
-
-        @param   data  File
-        """
+class FilesystemVertex(Filesystem, Vertex, metaclass=ABCMeta):
+    """ Filesystem vertex abstract base class """
 
 
 class RouteTransformation(CostBearing, metaclass=ABCMeta):
@@ -359,12 +174,11 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
 
         NOTE The templating engine that is injected into as instance of
         this class MUST define a template named "script", in which you
-        may use the following variables:
+        may use the following variables, of type Date, which have
+        .filesystem and .address attributes:
 
-        * source_fs  Source filesystem
-        * source     Source location
-        * target_fs  Target filesystem
-        * target     Target location
+        * source  Source data
+        * target  Target data
         """
         # TODO Subclass this, rather than relying on runtime checks
         assert "script" in templating.templates
@@ -398,7 +212,7 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         self.cost += transform.cost
         return self
 
-    def get_transform(self, transform_type:T.Type[RouteTransformation]) -> T.Any:
+    def get_transform(self, transform_type:T.Type[RouteTransformation]) -> RouteTransformation:
         """ Filter the transforms by type and compose """
         transformers = (t for t in self.payload if isinstance(t, transform_type))
         return sum(transformers, _zeros[transform_type])
@@ -435,11 +249,5 @@ class TransferRoute(Edge, T.Carrier[T.List[RouteTransformation]]):
         io_transformer = self.get_transform(RouteIOTransformation)
 
         for source, target in io_transformer(io_generator):
-            tags = RenderTags(
-                source_fs = self.source.name,
-                source    = source,
-                target_fs = self.target.name,
-                target    = target)
-
-            rendered = self._templating.render("transfer", **tags.mapping)
-            yield rendered, tags
+            rendered = self._templating.render("transfer", source=source, target=target)
+            yield rendered, source, target

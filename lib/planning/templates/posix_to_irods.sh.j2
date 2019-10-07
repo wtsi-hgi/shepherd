@@ -7,10 +7,10 @@ declare RESTART_INFO="$(mktemp -d)"
 trap 'rm -rf "${RESTART_INFO}"' EXIT
 
 # Create collection for target, if it doesn't already exist
-imkdir -p "{{ target | dirname | sh_escape }}"
+imkdir -p "{{ target.address | dirname | sh_escape }}"
 
 # Copy source file to target data object
 iput -fKT --wlock --retries 3 \
      -X "${RESTART_INFO}/restart" \
      --lfrestart "${RESTART_INFO}/lfrestart" \
-     "{{ source | sh_escape }}" "{{ target | sh_escape }}"
+     "{{ source.address | sh_escape }}" "{{ target.address | sh_escape }}"

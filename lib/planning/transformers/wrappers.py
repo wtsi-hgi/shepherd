@@ -31,8 +31,8 @@ declare start="$(date +%s)"
 
 cat >&2 <<-EOF
 	#### START TELEMETRY ###################################################
-	## Source: {{ from }} {{ source | sh_escape }}
-	## Target: {{ to }} {{ target | sh_escape }}
+	## Source: {{ source.filesystem }} {{ source.address | sh_escape }}
+	## Target: {{ target.filesystem }} {{ target.address | sh_escape }}
 	## Username: $(id -un) ($(id -u))
 	## Hostname: $(hostname)
 	## Start Time: $(date -d "@${start}")

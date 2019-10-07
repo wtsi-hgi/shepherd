@@ -24,7 +24,8 @@ import os
 from common import types as T
 from common.constants import BLOCKSIZE
 from common.exceptions import NOT_IMPLEMENTED
-from ..transfer import DataLocation, DataGenerator, FilesystemVertex, UnsupportedByFilesystem
+from models.filesystem import Data, DataGenerator, UnsupportedByFilesystem
+from ..transfer import FilesystemVertex
 
 
 _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-value metadata")
@@ -32,6 +33,9 @@ _NO_METADATA = UnsupportedByFilesystem("POSIX filesystems do not support key-val
 
 class POSIXFilesystem(FilesystemVertex):
     """ Filesystem vertex implementation for POSIX-like filesystems """
+    # TODO While it's trivial, we should separate out the Filesystem and
+    # FilesystemVertex definitions. In fact, perhaps the Filesystem
+    # implementations should be common models...
     def __init__(self, *, name:str = "POSIX", max_concurrency:int = 1) -> None:
         self._name = name
         self.max_concurrency = max_concurrency
@@ -39,20 +43,20 @@ class POSIXFilesystem(FilesystemVertex):
     def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
         raise _NO_METADATA
 
-    def set_metadata(self, data:DataLocation, **metadata:str) -> None:
+    def set_metadata(self, address:T.Path, **metadata:str) -> None:
         raise _NO_METADATA
 
-    def delete_metadata(self, data:DataLocation, *keys:str) -> None:
+    def delete_metadata(self, address:T.Path, *keys:str) -> None:
         raise _NO_METADATA
 
-    def _accessible(self, data:DataLocation) -> bool:
-        return data.exists() and os.access(data, os.R_OK)
+    def _accessible(self, address:T.Path) -> bool:
+        return address.exists() and os.access(address, os.R_OK)
 
-    def _identify_by_stat(self, path:DataLocation, *, name:str = "*") -> DataGenerator:
+    def _identify_by_stat(self, address:T.Path, *, name:str = "*") -> DataGenerator:
         # TODO
         raise NOT_IMPLEMENTED
 
-    def _identify_by_fofn(self, fofn:DataLocation, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
+    def _identify_by_fofn(self, fofn:T.Path, *, delimiter:str = "\n", compressed:bool = False) -> DataGenerator:
         opener = open if not compressed else gzip.open
 
         with opener(fofn, mode="rt") as f:
@@ -68,24 +72,30 @@ class POSIXFilesystem(FilesystemVertex):
                     last += record_chunks
 
                 else:
-                    yield DataLocation(last + record_chunks[0])
+                    yield Data(
+                        filesystem = self,
+                        address    = T.Path(last + record_chunks[0]))
 
                     for record in record_chunks[1:-1]:
-                        yield DataLocation(record)
+                        yield Data(
+                            filesystem = self,
+                            address    = T.Path(record))
 
                     last = record_chunks[-1]
 
             if last:
-                yield DataLocation(last)
+                yield Data(
+                    filesystem = self,
+                    address    = T.Path(last))
 
     @property
     def supported_checksums(self) -> T.List[str]:
         return list(hashlib.algorithms_available)
 
-    def _checksum(self, algorithm:str, data:DataLocation) -> str:
+    def _checksum(self, algorithm:str, address:T.Path) -> str:
         h = hashlib.new(algorithm)
 
-        with open(data, "rb") as f:
+        with open(address, "rb") as f:
             while True:
                 block = f.read(BLOCKSIZE)
                 if not block:
@@ -95,8 +105,8 @@ class POSIXFilesystem(FilesystemVertex):
 
         return h.hexdigest()
 
-    def _size(self, data:DataLocation) -> int:
-        return data.stat().st_size
+    def _size(self, address:T.Path) -> int:
+        return address.stat().st_size
 
-    def delete_data(self, data:DataLocation) -> None:
-        data.unlink()
+    def delete_data(self, address:T.Path) -> None:
+        address.unlink()
