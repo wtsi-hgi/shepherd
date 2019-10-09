@@ -41,7 +41,7 @@ class DataInaccessible(BaseException):
 @dataclass
 class Data:
     """ Simple file object model """
-    filesystem:Filesystem
+    filesystem:BaseFilesystem
     address:T.Path
 
 DataGenerator = T.Iterable[Data]

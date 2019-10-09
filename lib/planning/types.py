@@ -28,13 +28,13 @@ from functools import singledispatch
 from common import types as T
 from common.templating import BaseTemplating
 from common.models.graph import Vertex, BaseCost, CostBearing, Edge
+from common.models.task import Task
 from common.models.filesystems.types import Data, DataGenerator, BaseFilesystem
 
 
 IOGenerator = T.Iterable[T.Tuple[Data, Data]]
 
-# Generator of tuples: rendered script, source data, target data
-TransferGenerator = T.Iterable[T.Tuple[str, Data, Data]]
+TaskGenerator = T.Iterable[Task]
 
 
 class PolynomialComplexity(BaseCost):
@@ -224,7 +224,7 @@ class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
         transformers = (t for t in self.payload if isinstance(t, transform_type))
         return sum(transformers, _zeros[transform_type])
 
-    def _plan_by_query(self, query:str) -> TransferGenerator:
+    def _plan_by_query(self, query:str) -> TaskGenerator:
         """
         Identify data from the source filesystem vertex, based on the
         given query, and pair this with the rendered transformation
@@ -235,7 +235,7 @@ class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
         """
         return self._plan_by_data_generator(self.source.identify(query))
 
-    def _plan_by_data_generator(self, data:DataGenerator) -> TransferGenerator:
+    def _plan_by_data_generator(self, data:DataGenerator) -> TaskGenerator:
         """
         Pair the incoming data stream with the rendered transformation
         script and target filesystem location
@@ -257,4 +257,4 @@ class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
 
         for source, target in io_transformer(io_generator):
             rendered = self._templating.render("transfer", source=source, target=target)
-            yield rendered, source, target
+            yield Task(rendered, source, target)
