@@ -17,9 +17,27 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+import subprocess
+import stat
 from dataclasses import dataclass
+from tempfile import TemporaryDirectory
 
+from .. import types as T
 from .filesystems.types import Data
+
+
+class ExitCode(T.Carrier[int]):
+    """ Process exit code model """
+    def __init__(self, exit_code:int) -> None:
+        self.payload = exit_code
+
+    @property
+    def exit_code(self) -> int:
+        # Convenience alias
+        return self.payload
+
+    def __bool__(self) -> bool:
+        return self.payload == 0
 
 
 @dataclass(frozen=True)
@@ -29,4 +47,14 @@ class Task:
     source:Data
     target:Data
 
-    # TODO Stuff here to do useful work...
+    def __call__(self) -> ExitCode:
+        """ Execute the task """
+        with TemporaryDirectory() as tmp:
+            # Write task to disk and make it executable
+            task = T.Path(tmp) / "task"
+            task.touch(mode=stat.S_IRWXU)
+            task.write_text(self.script)
+
+            # Run the thing
+            result = subprocess.run(str(task), cwd=tmp, check=False)
+            return ExitCode(result.returncode)
