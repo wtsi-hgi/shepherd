@@ -58,6 +58,10 @@ class JobStatus:
         return until - self.start
 
 
+# TODO Adaptors for Data and Task that augment them with machinery to
+# track and update persisted state (maybe an ABC mixin?)
+
+
 Identifier = T.TypeVar("Identifier")
 
 class BaseJob(T.Iterator[Task], metaclass=ABCMeta):

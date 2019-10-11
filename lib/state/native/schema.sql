@@ -130,6 +130,54 @@ create view if not exists task_status as
   on        attempts.task  = tasks.id
   where     attempts.task is null;
 
+-- Overall job status
+create view if not exists job_status as
+  select   tasks.job,
+
+           -- Pending: Non-zero exit code and fewer attempts than maximum
+           sum(case when
+             task_status.attempt < job_parameters.max_attempts
+             and task_status.exit_code is not null
+             and task_status.exit_code != 0
+             then 1
+             else 0
+           end) as pending,
+
+           -- Running: Null exit code
+           sum(case when
+             task_status.exit_code is null
+             then 1
+             else 0
+           end) as running,
+
+           -- Failed: Non-zero exit code at maximum attempts
+           sum(case when
+             task_status.attempt = job_parameters.max_attempts
+             and task_status.exit_code is not null
+             and task_status.exit_code != 0
+             then 1
+             else 0
+           end) as failed,
+
+           -- Succeeded: Zero exit code
+           sum(case when
+             task_status.exit_code = 0
+             then 1
+             else 0
+           end) as succeeded,
+
+           max(jobs.start)  as start,
+           max(jobs.finish) as finish
+
+  from     task_status
+  join     tasks
+  on       tasks.id = task_status.task
+  join     jobs
+  on       jobs.id = tasks.job
+  join     job_parameters
+  on       job_parameters.job = jobs.id
+  group by tasks.job;
+
 -- Tasks ready to be actioned
 create view if not exists todo as
   select    tasks.id as task,

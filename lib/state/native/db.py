@@ -25,9 +25,9 @@ import stat
 import sqlite3
 from tempfile import mkdtemp
 
-from common import types as T
+from common import types as T, time
 from common.models.task import Task
-from ..types import BaseJob, JobStatus
+from ..types import BaseJob, DataNotReady, JobStatus
 
 
 # Internal constants
@@ -55,6 +55,7 @@ def create_root(parent:T.Optional[T.Path] = None):
 
 
 class NativeJob(BaseJob):
+    """ SQLite-Based Persistence Engine """
     def __init__(self, state:T.Path, *, job_id:T.Optional[int] = None, force_restart:bool = False) -> None:
         # Create state root, if it doesn't exist
         state.mkdir(mode=stat.S_IRWXU, parents=True, exist_ok=True)
@@ -108,7 +109,7 @@ class NativeJob(BaseJob):
             for data_name, data_obj in data.items():
                 cur = conn.execute(
                     "insert into data(filesystem, address) values (?, ?)",
-                    (data_obj.filesystem, data_obj.address))
+                    (data_obj.filesystem.name, str(data_obj.address)))
                 data_id[data_name] = cur.lastrowid
 
             # TODO Task dependencies
@@ -119,8 +120,21 @@ class NativeJob(BaseJob):
         return self
 
     def __next__(self) -> Task:
-        pass
+        if self.status.pending == 0:
+            raise StopIteration("No more pending tasks")
+
+        # TODO Fetch next task and create attempt
+
+        raise DataNotReady("Pending tasks have unresolved dependencies")
 
     @property
     def status(self) -> JobStatus:
-        pass
+        with self._db as conn:
+            cur = conn.execute(
+                "select pending, running, failed, succeeded, start, finish from job_status where job = ?",
+                (self.job_id,))
+
+            # TODO Convert start (and finish) to DateTime
+            status = cur.fetchone()
+
+        return JobStatus(*status)
