@@ -22,28 +22,53 @@ with this program. If not, see https://www.gnu.org/licenses/
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 
-from common import types as T
+from common import types as T, time
 from common.models.task import Task
-from common.exceptions import NOT_IMPLEMENTED
 
 
 class DataNotReady(BaseException):
     """ Raised when data is not yet available """
 
-class NoCommonChecksum(BaseException):
-    """ Raised when two data objects do not have a common checksum """
+class NoCommonChecksumAlgorithm(BaseException):
+    """ Raised when filesystems do not share a common checksumming algorithm """
 
 
-Identifier = T.Any
+@dataclass
+class JobStatus:
+    """ Model for expressing job task status and properties """
+    pending:int
+    running:int
+    failed:int
+    succeeded:int
 
-class BaseJob(T.Iterable[Task], metaclass=ABCMeta):
+    start:T.DateTime
+    finish:T.Optional[T.DateTime] = None
+
+    def __bool__(self) -> bool:
+        # Return truthy if there are still jobs pending
+        # TODO ...or running??
+        return self.pending > 0
+
+    @property
+    def runtime(self) -> T.TimeDelta:
+        """ Job runtime """
+        until = self.finish or time.now()
+        return until - self.start
+
+
+Identifier = T.TypeVar("Identifier")
+
+class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     """
     Abstract base class for jobs
 
     Implementations required:
     * __init__ :: Any x Optional[Identifier] x bool -> None
     * __iadd__ :: Task -> BaseJob
+    * __next__ :: () -> Task
+    * status   :: () -> JobStatus
     """
     _job_id:Identifier
     _max_attempts:int
@@ -67,7 +92,16 @@ class BaseJob(T.Iterable[Task], metaclass=ABCMeta):
     def __iadd__(self, task:Task) -> BaseJob:
         """ Add a task to the job """
 
-    # TODO
-    # * Method to fetch the next pending task
-    # * Property to fetch the status (pending, running, succeeded, failed)
-    # * etc...?
+    def __iter__(self) -> BaseJob:
+        return self
+
+    @abstractmethod
+    def __next__(self) -> Task:
+        """ Fetch the next pending task to execute """
+
+    @property
+    @abstractmethod
+    def status(self) -> JobStatus:
+        """ Get the current job status """
+
+    # TODO Setting and/or checking of checksums, sizes and metadata...
