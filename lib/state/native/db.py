@@ -25,8 +25,9 @@ import stat
 import sqlite3
 from tempfile import mkdtemp
 
-from common import types as T, time
+from common import types as T
 from common.models.task import Task
+from common.models.filesystems.types import Data
 from ..types import BaseJob, DataNotReady, JobStatus
 
 
@@ -123,7 +124,45 @@ class NativeJob(BaseJob):
         if self.status.pending == 0:
             raise StopIteration("No more pending tasks")
 
-        # TODO Fetch next task and create attempt
+        # TODO Partitioning scheme so workers don't conflict (or
+        # enforced read locking, by which SQLite database on networked
+        # filesystems might not abide)
+        with self._db as conn:
+            cur = conn.execute(
+                "select task, source_filesystem, source_address, target_filesystem, target_address, script from todo where job = ?",
+                (self.job_id,))
+
+            task_id, *task_details = cur.fetchone() or (None, None)
+
+            if task_id is not None:
+                # Create new attempt
+                # FIXME Race condition here without locking/partitioning
+                cur = conn.execute(
+                    "select attempt from task_status where task = ?",
+                    (task_id,))
+
+                last_attempt, *_ = cur.fetchone()
+
+                conn.execute(
+                    "insert into attempts(task, attempt) values (?, ?)",
+                    (task_id, last_attempt + 1))
+
+                # Create Task object from database record
+                names      = ["source", "target"]
+                filesystem = {}
+                address    = {}
+
+                filesystem["source"], address["source"], \
+                    filesystem["target"], address["target"], \
+                    script = task_details
+
+                data = {
+                    data_name: Data(
+                        filesystem = self.filesystem_mapping[filesystem[data_name]],
+                        address    = T.Path(address[data_name]))
+                    for data_name in names}
+
+                return Task(script=script, **data)
 
         raise DataNotReady("Pending tasks have unresolved dependencies")
 

@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from common import types as T, time
 from common.models.task import Task
+from common.models.filesystems.types import BaseFilesystem
 
 
 class DataNotReady(BaseException):
@@ -77,6 +78,7 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     _job_id:Identifier
     _max_attempts:int
     _max_concurrency:int
+    _filesystems:T.Dict[str, BaseFilesystem]
 
     # TODO Properties that expose max_attempts and max_concurrency
     # FIXME The maximum concurrency is a property of the filesystems
@@ -95,6 +97,17 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     @property
     def job_id(self) -> Identifier:
         return self._job_id
+
+    @property
+    def filesystem_mapping(self) -> T.Dict[str, BaseFilesystem]:
+        # FIXME? This injection is a bit primitive...
+        return self._filesystems
+
+    @filesystem_mapping.setter
+    def filesystem_mapping(self, mapping:T.Dict[str, BaseFilesystem]) -> None:
+        """ Inject filesystem mappings """
+        # FIXME? This injection is a bit primitive...
+        self._filesystems = mapping
 
     @abstractmethod
     def __iadd__(self, task:Task) -> BaseJob:
