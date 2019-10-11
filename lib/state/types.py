@@ -104,4 +104,10 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     def status(self) -> JobStatus:
         """ Get the current job status """
 
-    # TODO Setting and/or checking of checksums, sizes and metadata...
+    # TODO
+    # * Setting and/or checking of checksums, sizes and metadata
+    # * Checksumming is not necessarily an operation provided by the
+    #   filesystem and therefore needs to be done manually, which takes
+    #   time; i.e., it's wrong to assume we can just get the checksum
+    #   without potentially blocking for ages
+    # * How to keep track of attempts?
