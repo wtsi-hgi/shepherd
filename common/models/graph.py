@@ -147,7 +147,7 @@ class Graph(T.Container[Vertex]):
 
         return union
 
-    def neighbours(self, vertex:Vertex) -> T.Iterable[Edge]:
+    def neighbours(self, vertex:Vertex) -> T.Iterator[Edge]:
         """
         Return all immediate neighbours, by edge, of a vertex
 

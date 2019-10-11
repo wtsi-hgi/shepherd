@@ -44,7 +44,7 @@ class Data:
     filesystem:BaseFilesystem
     address:T.Path
 
-DataGenerator = T.Iterable[Data]
+DataGenerator = T.Iterator[Data]
 
 
 class BaseFilesystem(metaclass=ABCMeta):
@@ -53,9 +53,9 @@ class BaseFilesystem(metaclass=ABCMeta):
 
     Implementations required:
     * _accessible           :: Path -> bool
-    * _identify_by_metadata :: Path x kwargs -> Iterable[Data]
-    * _identify_by_stat     :: TODO... -> Iterable[Data]
-    * _identify_by_fofn     :: Path -> Iterable[Data]
+    * _identify_by_metadata :: Path x kwargs -> Iterator[Data]
+    * _identify_by_stat     :: TODO... -> Iterator[Data]
+    * _identify_by_fofn     :: Path -> Iterator[Data]
     * supported_checksums   :: () -> List[str]
     * _checksum             :: str x Path -> str
     * _size                 :: Path -> int

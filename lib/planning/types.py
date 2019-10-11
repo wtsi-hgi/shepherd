@@ -32,9 +32,9 @@ from common.models.task import Task
 from common.models.filesystems.types import Data, DataGenerator, BaseFilesystem
 
 
-IOGenerator = T.Iterable[T.Tuple[Data, Data]]
+IOGenerator = T.Iterator[T.Tuple[Data, Data]]
 
-TaskGenerator = T.Iterable[Task]
+TaskGenerator = T.Iterator[Task]
 
 
 class PolynomialComplexity(BaseCost):
