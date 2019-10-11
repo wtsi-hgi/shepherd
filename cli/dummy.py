@@ -18,33 +18,46 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from common import types as T
-from lib.planning.transfer import DataLocation
-from lib.planning.filesystems import POSIXFilesystem, iRODSFilesystem
+from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
 from lib.planning.transformers import strip_common_prefix, last_n_components, prefix, telemetry, debugging
 from lib.planning.route_factories import posix_to_irods_factory
-from lib.state.native.hack import HackityHackHack, create_root
+from lib.state.native import NativeJob, create_root
 
 def main(*args:str) -> None:
     fofn, *_ = args
 
     lustre = POSIXFilesystem(name="Lustre", max_concurrency=50)
     irods = iRODSFilesystem()
+
     transfer = posix_to_irods_factory(lustre, irods)
     transfer += strip_common_prefix
-    transfer += prefix(DataLocation("/here/is/a/prefix"))
+    transfer += prefix(T.Path("/here/is/a/prefix"))
     transfer += last_n_components(4)
     transfer += debugging
     transfer += telemetry
 
     state_root = create_root(T.Path("."))
-    state = HackityHackHack(state_root)
-    state.max_concurrency = min(lustre.max_concurrency, irods.max_concurrency)
+    state = NativeJob(state_root)
 
-    print(f"State: {state_root}")
-    print(f"Job ID: {state.job}")
-    print(f"Max. Concurrency: {state.max_concurrency}")
+    print(f"State:  {state_root}")
+    print(f"Job ID: {state.job_id}")
 
+    tasks = 0
     files = lustre._identify_by_fofn(T.Path(fofn))
-    for script, tags in transfer.plan(files):
-        task_id = state.add_task(script, **tags.mapping)
-        print(f"Task {task_id}: {tags.source} to {tags.target}")
+    for task in transfer.plan(files):
+        print(("=" if tasks == 0 else "-") * 72)
+
+        state += task
+        tasks += 1
+
+        print(f"Source: {task.source.filesystem} {task.source.address}")
+        print(f"Target: {task.target.filesystem} {task.target.address}")
+
+    print("=" * 72)
+    print(f"Added {tasks} tasks to job:")
+
+    status = state.status
+    print(f"* Pending:   {status.pending}")
+    print(f"* Running:   {status.running}")
+    print(f"* Failed:    {status.failed}")
+    print(f"* Succeeded: {status.succeeded}")
