@@ -88,6 +88,10 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
         @param  force_restart  Whether to forcibly resume a job
         """
 
+    @property
+    def job_id(self) -> Identifier:
+        return self._job_id
+
     @abstractmethod
     def __iadd__(self, task:Task) -> BaseJob:
         """ Add a task to the job """
