@@ -23,7 +23,7 @@ from common import types as T
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
 from lib.planning.transformers import strip_common_prefix, last_n_components, prefix, telemetry, debugging
 from lib.planning.route_factories import posix_to_irods_factory
-from lib.state.types import JobStatus, DataNotReady
+from lib.state.types import JobStatus, DataNotReady, WorkerRedundant
 from lib.state.native import NativeJob, create_root
 
 
@@ -94,7 +94,12 @@ def run_state(state_root:str, job_id:int, worker_index:T.Optional[int] = None) -
         job.worker_index = worker_index
         print(f"Worker ID:        {worker_index}")
 
-    print_status(job.status)
+    try:
+        print_status(job.status)
+
+    except WorkerRedundant:
+        print("* Worker has nothing to do; terminating.")
+        exit(0)
 
     tasks = 0
     while job.status:
