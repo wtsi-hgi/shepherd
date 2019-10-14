@@ -28,7 +28,7 @@ from tempfile import mkdtemp
 from common import types as T
 from common.models.task import Task
 from common.models.filesystems.types import Data
-from ..types import BaseJob, DataNotReady, JobStatus
+from ..types import BaseJob, DataNotReady, JobStatus, WorkerRedundant
 
 
 # Internal constants
@@ -53,6 +53,56 @@ def create_root(parent:T.Optional[T.Path] = None):
         parent = parent.absolute()
 
     return T.Path(mkdtemp(prefix=_TEMP_PREFIX, dir=parent))
+
+
+_JOB_STATUS_ALL = r"""
+    select   sum(pending),
+             sum(running),
+             sum(failed),
+             sum(succeeded),
+             max(start),
+             max(finish)
+    from     job_status
+    where    job = ?
+    group by job
+"""
+
+_NEXT_TASK_ALL = r"""
+    select task,
+           source_filesystem,
+           source_address,
+           target_filesystem,
+           target_address,
+           script
+    from   todo
+    where  job = ?
+"""
+
+_JOB_STATUS_BY_WORKER = r"""
+    select pending,
+           running,
+           failed,
+           succeeded,
+           start,
+           finish
+    from   job_status
+    where  job       = ?
+    and    worker_id = ?
+"""
+
+_NEXT_TASK_BY_WORKER = r"""
+    select todo.task,
+           todo.source_filesystem,
+           todo.source_address,
+           todo.target_filesystem,
+           todo.target_address,
+           todo.script
+    from   todo
+    join   job_parameters
+    on     job_parameters.job = todo.job
+    where  todo.job                                   = ?
+    and    todo.task % job_parameters.max_concurrency = ?
+"""
 
 
 class NativeJob(BaseJob):
@@ -128,21 +178,17 @@ class NativeJob(BaseJob):
 
     def __next__(self) -> Task:
         if self.status.pending == 0:
-            raise StopIteration("No more pending tasks")
+            raise StopIteration("No more pending tasks for worker")
 
-        # TODO Partitioning scheme so workers don't conflict (or
-        # enforced read locking, by which SQLite database on networked
-        # filesystems might not abide)
         with self._db as conn:
-            cur = conn.execute(
-                "select task, source_filesystem, source_address, target_filesystem, target_address, script from todo where job = ?",
-                (self.job_id,))
+            sql_params = (_NEXT_TASK_ALL, (self.job_id,)) if self._worker_index is None \
+                    else (_NEXT_TASK_BY_WORKER, (self.job_id, self.worker_index))
 
+            cur = conn.execute(*sql_params)
             task_id, *task_details = cur.fetchone() or (None, None)
 
             if task_id is not None:
                 # Create new attempt
-                # FIXME Race condition here without locking/partitioning
                 cur = conn.execute(
                     "select attempt from task_status where task = ?",
                     (task_id,))
@@ -175,12 +221,14 @@ class NativeJob(BaseJob):
     @property
     def status(self) -> JobStatus:
         with self._db as conn:
-            cur = conn.execute(
-                "select pending, running, failed, succeeded, start, finish from job_status where job = ?",
-                (self.job_id,))
+            sql_params = (_JOB_STATUS_ALL, (self.job_id,)) if self._worker_index is None \
+                    else (_JOB_STATUS_BY_WORKER, (self.job_id, self.worker_index))
 
-            # TODO Convert start (and finish) to DateTime
-            status = cur.fetchone()
+            cur = conn.execute(*sql_params)
+            status = cur.fetchone()  # TODO Convert start (and finish) to DateTime
+
+            if status is None:
+                raise WorkerRedundant(f"Worker {self.worker_index} has nothing to do")
 
         return JobStatus(*status)
 

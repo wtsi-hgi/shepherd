@@ -130,9 +130,10 @@ create view if not exists task_status as
   on        attempts.task  = tasks.id
   where     attempts.task is null;
 
--- Overall job status
+-- Overall job status, partitioned by worker
 create view if not exists job_status as
   select   tasks.job,
+           tasks.id % job_parameters.max_concurrency as worker_id,
 
            -- Pending: Non-zero exit code and fewer attempts than maximum
            sum(case when
@@ -176,7 +177,8 @@ create view if not exists job_status as
   on       jobs.id = tasks.job
   join     job_parameters
   on       job_parameters.job = jobs.id
-  group by tasks.job;
+  group by tasks.job,
+           worker_id;
 
 -- Tasks ready to be actioned
 create view if not exists todo as

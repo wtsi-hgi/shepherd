@@ -32,6 +32,9 @@ from common.models.filesystems.types import BaseFilesystem
 class DataNotReady(BaseException):
     """ Raised when data is not yet available """
 
+class WorkerRedundant(BaseException):
+    """ Raised when a worker has nothing to do """
+
 class NoCommonChecksumAlgorithm(BaseException):
     """ Raised when filesystems do not share a common checksumming algorithm """
 

@@ -90,7 +90,7 @@ def run_state(state_root:str, job_id:int, worker_index:T.Optional[int] = None) -
 
     if worker_index is not None:
         worker_index = int(worker_index)
-        assert 0 <= worker_index < job.max_concurrency, "Worker index out of bounds"
+        assert 0 < worker_index <= job.max_concurrency, "Worker index out of bounds"
         job.worker_index = worker_index
         print(f"Worker ID:        {worker_index}")
 
