@@ -138,8 +138,8 @@ create view if not exists job_status as
            -- Pending: Non-zero exit code and fewer attempts than maximum
            sum(case when
              task_status.attempt < job_parameters.max_attempts
-             and task_status.exit_code is not null
-             and task_status.exit_code != 0
+               and task_status.exit_code is not null
+               and task_status.exit_code != 0
              then 1
              else 0
            end) as pending,
@@ -154,8 +154,8 @@ create view if not exists job_status as
            -- Failed: Non-zero exit code at maximum attempts
            sum(case when
              task_status.attempt = job_parameters.max_attempts
-             and task_status.exit_code is not null
-             and task_status.exit_code != 0
+               and task_status.exit_code is not null
+               and task_status.exit_code != 0
              then 1
              else 0
            end) as failed,
