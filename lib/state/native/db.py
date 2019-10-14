@@ -57,6 +57,8 @@ def create_root(parent:T.Optional[T.Path] = None):
 
 class NativeJob(BaseJob):
     """ SQLite-Based Persistence Engine """
+    _worker_index:T.Optional[int]
+
     def __init__(self, state:T.Path, *, job_id:T.Optional[int] = None, force_restart:bool = False) -> None:
         # Create state root, if it doesn't exist
         state.mkdir(mode=stat.S_IRWXU, parents=True, exist_ok=True)
@@ -87,17 +89,21 @@ class NativeJob(BaseJob):
                     where  (task, attempt) in (select task, attempt from previously_running)
                 """)
 
+        # FIXME We hardcode the worker index, max_attempts and
+        # max_concurrency for now... This needs more thought!
+        self._worker_index = None
+        max_attempts       = 3
+        max_concurrency    = 1
+
         if job_id is None:
             # Create new job
             with self._db as conn:
                 cur = conn.execute("insert into jobs default values")
                 job_id = cur.lastrowid
 
-                # FIXME We hardcode max_attempts and max_concurrency for
-                # now... This needs more thought!
                 conn.execute(
                     "insert into job_parameters(job, max_attempts, max_concurrency) values (?, ?, ?)",
-                    (job_id, 3, 1))
+                    (job_id, max_attempts, max_concurrency))
 
         self._job_id = job_id
 
@@ -177,3 +183,49 @@ class NativeJob(BaseJob):
             status = cur.fetchone()
 
         return JobStatus(*status)
+
+    # FIXME? All this injection stuff is a bit primitive...
+    @property
+    def worker_index(self) -> T.Optional[int]:
+        return self._worker_index
+
+    @worker_index.setter
+    def worker_index(self, value:int) -> None:
+        self._worker_index = value
+
+    def _job_params(self) -> T.Tuple[int, int]:
+        with self._db as conn:
+            max_attempts, max_concurrency = conn.execute(
+                "select max_attempts, max_concurrency from job_parameters where job = ?",
+                (self.job_id,)).fetchone()
+
+        return max_attempts, max_concurrency
+
+    @property
+    def max_attempts(self) -> int:
+        max_attempts, _ = self._job_params()
+        return max_attempts
+
+    @max_attempts.setter
+    def max_attempts(self, value:int) -> None:
+        assert value > 0
+
+        with self._db as conn:
+            conn.execute(
+                "update job_parameters set max_attempts = ? where job = ?",
+                (value, self.job_id))
+
+    @property
+    def max_concurrency(self) -> int:
+        _, max_concurrency = self._job_params()
+        return max_concurrency
+
+    @max_concurrency.setter
+    def max_concurrency(self, value:int) -> None:
+        # TODO Abstract this (see max_attempts.setter)
+        assert value > 0
+
+        with self._db as conn:
+            conn.execute(
+                "update job_parameters set max_concurrency = ? where job = ?",
+                (value, self.job_id))

@@ -76,13 +76,7 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     * status   :: () -> JobStatus
     """
     _job_id:Identifier
-    _max_attempts:int
-    _max_concurrency:int
     _filesystems:T.Dict[str, BaseFilesystem]
-
-    # TODO Properties that expose max_attempts and max_concurrency
-    # FIXME The maximum concurrency is a property of the filesystems
-    # involved in a task, rather than that of an entire job
 
     @abstractmethod
     def __init__(self, state:T.Any, *, job_id:T.Optional[Identifier] = None, force_restart:bool = False) -> None:
@@ -97,17 +91,6 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     @property
     def job_id(self) -> Identifier:
         return self._job_id
-
-    @property
-    def filesystem_mapping(self) -> T.Dict[str, BaseFilesystem]:
-        # FIXME? This injection is a bit primitive...
-        return self._filesystems
-
-    @filesystem_mapping.setter
-    def filesystem_mapping(self, mapping:T.Dict[str, BaseFilesystem]) -> None:
-        """ Inject filesystem mappings """
-        # FIXME? This injection is a bit primitive...
-        self._filesystems = mapping
 
     @abstractmethod
     def __iadd__(self, task:Task) -> BaseJob:
@@ -126,9 +109,22 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
         """ Get the current job status """
 
     # TODO
+    # * Exposure of maximum attempts and concurrency
+    #   (FIXME the maximum concurrency is a property of the filesystems
+    #   involved in a task, rather than that of an entire job...)
     # * Setting and/or checking of checksums, sizes and metadata
     # * Checksumming is not necessarily an operation provided by the
     #   filesystem and therefore needs to be done manually, which takes
     #   time; i.e., it's wrong to assume we can just get the checksum
     #   without potentially blocking for ages
     # * How to keep track of attempts?
+
+    # FIXME? This injection is a bit primitive...
+    @property
+    def filesystem_mapping(self) -> T.Dict[str, BaseFilesystem]:
+        return self._filesystems
+
+    @filesystem_mapping.setter
+    def filesystem_mapping(self, mapping:T.Dict[str, BaseFilesystem]) -> None:
+        """ Inject filesystem mappings """
+        self._filesystems = mapping

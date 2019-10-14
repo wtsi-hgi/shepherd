@@ -53,8 +53,14 @@ def create_state_from_fofn(fofn:T.Path) -> None:
     job = NativeJob(state_root)
     job.filesystem_mapping = _FS
 
-    print(f"State:  {state_root}")
-    print(f"Job ID: {job.job_id}")
+    # FIXME the maximum concurrency is a property of the filesystems
+    # involved in a task, rather than that of an entire job...
+    job.max_concurrency = min(fs.max_concurrency for fs in _FS.values())
+
+    print(f"State:            {state_root}")
+    print(f"Job ID:           {job.job_id}")
+    print(f"Max. Attempts:    {job.max_attempts}")
+    print(f"Max. Concurrency: {job.max_concurrency}")
 
     tasks = 0
     files = _FS["Lustre"]._identify_by_fofn(fofn)
@@ -72,13 +78,22 @@ def create_state_from_fofn(fofn:T.Path) -> None:
     print_status(job.status)
 
 
-def run_state(state_root:str, job_id:int) -> None:
+def run_state(state_root:str, job_id:int, worker_index:T.Optional[int] = None) -> None:
     """ Run through tasks in state database """
     job = NativeJob(T.Path(state_root), job_id=job_id, force_restart=True)
     job.filesystem_mapping = _FS
 
-    print(f"State:  {state_root}")
-    print(f"Job ID: {job.job_id}")
+    print(f"State:            {state_root}")
+    print(f"Job ID:           {job.job_id}")
+    print(f"Max. Attempts:    {job.max_attempts}")
+    print(f"Max. Concurrency: {job.max_concurrency}")
+
+    if worker_index is not None:
+        worker_index = int(worker_index)
+        assert 0 <= worker_index < job.max_concurrency, "Worker index out of bounds"
+        job.worker_index = worker_index
+        print(f"Worker ID:        {worker_index}")
+
     print_status(job.status)
 
     tasks = 0
