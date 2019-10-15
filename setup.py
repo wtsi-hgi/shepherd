@@ -40,10 +40,10 @@ setup(
     classifiers=[
         # TODO Insert more here...
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Programming Language :: Python :: 3.7"],
+        "Programming Language :: Python :: 3.8"],
 
     packages=["shepherd"],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
         # TODO Insert more here...
         "Jinja2"]

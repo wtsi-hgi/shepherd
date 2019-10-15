@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from copy import copy
-from functools import singledispatch
+from functools import singledispatchmethod
 
 from common import types as T
 from common.templating import BaseTemplating
@@ -196,13 +196,6 @@ class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
 
         super().__init__(source, target, directed=True)
 
-        # TODO From Python 3.8 there will be a singledispatchmethod
-        # decorator; move to this when it's available, rather than using
-        # the following workaround
-        self.plan = singledispatch(self._plan_by_data_generator)
-        self.plan.register(DataGenerator, self._plan_by_data_generator)
-        self.plan.register(str, self._plan_by_query)
-
     @property
     def source(self) -> BaseFilesystem:
         # Convenience alias
@@ -224,18 +217,8 @@ class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
         transformers = (t for t in self.payload if isinstance(t, transform_type))
         return sum(transformers, _zeros[transform_type])
 
-    def _plan_by_query(self, query:str) -> TaskGenerator:
-        """
-        Identify data from the source filesystem vertex, based on the
-        given query, and pair this with the rendered transformation
-        script and target filesystem location
-
-        @param   query  Search criteria
-        @return  Iterator of transfer plan steps
-        """
-        return self._plan_by_data_generator(self.source.identify(query))
-
-    def _plan_by_data_generator(self, data:DataGenerator) -> TaskGenerator:
+    @singledispatchmethod
+    def plan(self, data:DataGenerator) -> TaskGenerator:
         """
         Pair the incoming data stream with the rendered transformation
         script and target filesystem location
@@ -258,3 +241,15 @@ class TransferRoute(Edge, T.Carrier[T.List[BaseRouteTransformation]]):
         for source, target in io_transformer(io_generator):
             rendered = self._templating.render("transfer", source=source, target=target)
             yield Task(rendered, source, target)
+
+    @plan.register
+    def _(self, query:str) -> TaskGenerator:
+        """
+        Identify data from the source filesystem vertex, based on the
+        given query, and pair this with the rendered transformation
+        script and target filesystem location
+
+        @param   query  Search criteria
+        @return  Iterator of transfer plan steps
+        """
+        return self.plan(self.source.identify(query))
