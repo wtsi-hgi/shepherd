@@ -119,7 +119,7 @@ class LSFSubmissionOptions(BaseSubmissionOptions):
 
 class LSF(BaseExecutor):
     """ Platform LSF executor """
-    def __init__(self, name:str) -> None:
+    def __init__(self, name:str = "LSF") -> None:
         self._name = name
 
     def submit(self, command:str, *, \
