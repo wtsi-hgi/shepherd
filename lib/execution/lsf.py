@@ -17,6 +17,10 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+# We need postponed annotation evaluation for our recursive definitions
+# https://docs.python.org/3/whatsnew/3.7.html#pep-563-postponed-evaluation-of-annotations
+from __future__ import annotations
+
 from dataclasses import dataclass
 from signal import SIGTERM
 import os
@@ -50,6 +54,11 @@ class LSFWorkerStatus(BaseWorkerStatus):
     Unknown          = "UNKWN"
     Waiting          = "WAIT"
     Zombified        = "ZOMBI"
+
+    @classmethod
+    def _missing_(cls:LSFWorkerStatus, value:str) -> LSFWorkerStatus:
+        # TODO Log unrecognised status
+        return LSFWorkerStatus.Unknown
 
     @property
     def is_running(self) -> bool:
