@@ -31,8 +31,8 @@ class CouldNotSubmit(BaseException):
 class NoSuchWorker(BaseException):
     """ Raised when a worker cannot be dereferenced """
 
-class CouldNotSignalWorker(BaseException):
-    """ Raised when a signal could not be sent to a worker """
+class CouldNotAddressWorker(BaseException):
+    """ Raised when a worker cannot be addressed """
 
 class NotAWorker(BaseException):
     """ Raised when worker-specific invocations are made against non-workers """
@@ -126,7 +126,7 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
         """ Get the current worker identifier """
 
     @abstractmethod
-    def worker_status(self, worker:WorkerIdentifier) -> BaseWorkerStatus:
+    def worker_status(self, worker:T.Optional[WorkerIdentifier] = None) -> BaseWorkerStatus:
         """
         Get the status of a worker
 

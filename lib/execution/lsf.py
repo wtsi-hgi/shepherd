@@ -25,11 +25,13 @@ from dataclasses import dataclass
 from signal import SIGTERM
 import os
 import re
+import shlex
+import subprocess
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerStatus, \
-                   CouldNotSubmit, NoSuchWorker, CouldNotSignalWorker, NotAWorker, \
+                   CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
                    WorkerIdentifier
 
 
@@ -41,6 +43,12 @@ def _lsf_job_id(identifier:WorkerIdentifier) -> str:
         job_id += f"[{identifier.worker}]"
 
     return job_id
+
+def _run(command:str) -> subprocess.CompletedProcess:
+    """ Wrapper for running commands """
+    return subprocess.run(
+        shlex.split(command),
+        capture_output=True, check=False, text=True)
 
 
 class LSFWorkerStatus(BaseWorkerStatus):
@@ -97,7 +105,17 @@ class LSF(BaseExecutor):
         raise NOT_IMPLEMENTED
 
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:
-        raise NOT_IMPLEMENTED
+        # NOTE This sends a specific signal, rather than the default
+        # (non-parametrised) invocation of bkill
+        job_id = _lsf_job_id(worker)
+        bkill  = _run(f"bkill -s {signum} {job_id}")
+
+        if bkill.returncode != 0 or bkill.stderr is not None:
+            if "No matching job found" in bkill.stderr:
+                raise NoSuchWorker(f"No such LSF job: {job_id}")
+
+            # TODO Log stderr
+            raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
 
     @property
     def worker_id(self) -> WorkerIdentifier:
@@ -109,5 +127,19 @@ class LSF(BaseExecutor):
 
         return WorkerIdentifier(job_id, index_id)
 
-    def worker_status(self, worker:WorkerIdentifier) -> LSFWorkerStatus:
-        raise NOT_IMPLEMENTED
+    def worker_status(self, worker:T.Optional[WorkerIdentifier] = None) -> LSFWorkerStatus:
+        # Get our own status, if not specified
+        if worker is None:
+            worker = self.worker_id
+
+        job_id = _lsf_job_id(worker)
+        bjobs  = _run(f"bjobs -noheader -o stat {job_id}")
+
+        if bjobs.returncode != 0 or bjobs.stderr is not None:
+            if "not found" in bjobs.stderr:
+                raise NoSuchWorker(f"No such LSF job: {job_id}")
+
+            # TODO Log stderr
+            raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
+
+        return LSFWorkerStatus(bjobs.stdout)
