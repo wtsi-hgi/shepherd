@@ -10,7 +10,7 @@ trap 'rm -rf "${RESTART_INFO}"' EXIT
 imkdir -p "{{ target.address | dirname | sh_escape }}"
 
 # Copy source file to target data object
-iput -fKT --wlock --retries 3 \
+iput -fKT --retries 3 \
      -X "${RESTART_INFO}/restart" \
      --lfrestart "${RESTART_INFO}/lfrestart" \
      "{{ source.address | sh_escape }}" "{{ target.address | sh_escape }}"
