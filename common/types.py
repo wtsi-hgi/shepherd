@@ -45,3 +45,13 @@ class Carrier(Generic[_T]):
     @payload.setter
     def payload(self, value:_T) -> None:
         self._payload = value
+
+
+class Named:
+    """ Named object mixin """
+    _name:str
+
+    @property
+    def name(self) -> str:
+        """ Return the name of the object """
+        return self._name

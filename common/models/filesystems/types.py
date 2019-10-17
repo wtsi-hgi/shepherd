@@ -47,7 +47,7 @@ class Data:
 DataGenerator = T.Iterator[Data]
 
 
-class BaseFilesystem(metaclass=ABCMeta):
+class BaseFilesystem(T.Named, metaclass=ABCMeta):
     """
     Filesystem abstract base class
 
@@ -63,16 +63,10 @@ class BaseFilesystem(metaclass=ABCMeta):
     * delete_metadata       :: Path x args -> None
     * delete_data           :: Path -> None
     """
-    _name:str
     _max_concurrency:int
 
-    @property
-    def name(self) -> str:
-        # This should be read-only, set in the constructor
-        return self._name
-
     def __str__(self) -> str:
-        return self._name
+        return self.name
 
     @property
     def max_concurrency(self) -> int:

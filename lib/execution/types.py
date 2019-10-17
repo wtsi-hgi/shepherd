@@ -55,7 +55,7 @@ class WorkerIdentifier:
     worker:T.Optional[int] = None
 
 
-class BaseExecutor(metaclass=ABCMeta):
+class BaseExecutor(T.Named, metaclass=ABCMeta):
     """
     Abstract base executor class
 
@@ -65,12 +65,6 @@ class BaseExecutor(metaclass=ABCMeta):
     * worker_id     :: () -> WorkerIdentifier
     * worker_status :: worker -> BaseWorkerStatus
     """
-    _name:str
-
-    @property
-    def name(self) -> str:
-        return self._name
-
     @abstractmethod
     def submit(self, command:str, *, \
                      options:BaseSubmissionOptions, \
