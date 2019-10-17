@@ -44,10 +44,10 @@ def _lsf_job_id(identifier:WorkerIdentifier) -> str:
 
     return job_id
 
-def _run(command:str) -> subprocess.CompletedProcess:
+def _run(command:str, *, env:T.Optional[T.Dict[str, str]] = None) -> subprocess.CompletedProcess:
     """ Wrapper for running commands """
     return subprocess.run(
-        shlex.split(command),
+        shlex.split(command), env=env,
         capture_output=True, check=False, text=True)
 
 
@@ -99,8 +99,7 @@ def _args_to_lsf(arguments:T.Dict[str, T.Any]) -> str:
     return " ".join(
         f"-{_MAPPING.get(arg, arg)} \"{val}\""
         for arg, val in arguments.items()
-        if val is not None
-    )
+        if val is not None)
 
 
 @dataclass
@@ -115,8 +114,7 @@ class LSFSubmissionOptions(BaseSubmissionOptions):
         """ Generate the bsub arguments from submission options """
         return _args_to_lsf({
             **asdict(self),
-            "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"
-        })
+            "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
 
 
 class LSF(BaseExecutor):
@@ -136,11 +134,9 @@ class LSF(BaseExecutor):
         extra_args = _args_to_lsf({
             **({"o": stdout.resolve()} if stdout is not None else {}),
             **({"e": stderr.resolve()} if stderr is not None else {}),
-            **({"J": f"shepherd_worker[{workers}]"} if workers > 1 else {})
-            # TODO Environment variables
-        })
+            **({"J": f"shepherd_worker[{workers}]"} if workers > 1 else {})})
 
-        bsub = _run(f"bsub {options.args} {extra_args} {command}")
+        bsub = _run(f"bsub {options.args} {extra_args} {command}", env=env)
 
         if bsub.returncode != 0:
             # TODO Log stdout/stderr
@@ -150,7 +146,7 @@ class LSF(BaseExecutor):
 
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:
         # NOTE This sends a specific signal, rather than the default
-        # (non-parametrised) invocation of bkill
+        # (non-parametrised) behaviour of bkill as may be expected
         job_id = _lsf_job_id(worker)
         bkill  = _run(f"bkill -s {signum} {job_id}")
 
