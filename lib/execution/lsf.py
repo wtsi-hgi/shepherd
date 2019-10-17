@@ -21,7 +21,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 # https://docs.python.org/3/whatsnew/3.7.html#pep-563-postponed-evaluation-of-annotations
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from signal import SIGTERM
 import os
 import re
@@ -86,9 +86,37 @@ class LSFWorkerStatus(BaseWorkerStatus):
         return self == LSFWorkerStatus.Succeeded
 
 
+# Map convenience fields to LSF flags
+_MAPPING = {
+    "cores":  "n",
+    "memory": "M",
+    "queue":  "q",
+    "group":  "G"
+}
+
+def _args_to_lsf(arguments:T.Dict[str, T.Any]) -> str:
+    """ Helper to generate LSF-style command line options """
+    return " ".join(
+        f"-{_MAPPING.get(arg, arg)} \"{val}\""
+        for arg, val in arguments.items()
+        if val is not None
+    )
+
+
 @dataclass
 class LSFSubmissionOptions(BaseSubmissionOptions):
-    pass
+    # TODO This is currently pared down to what we're interested in
+    queue:T.Optional[str]  = None
+    group:T.Optional[str]  = None
+    cwd:T.Optional[T.Path] = None
+
+    @property
+    def args(self) -> str:
+        """ Generate the bsub arguments from submission options """
+        return _args_to_lsf({
+            **asdict(self),
+            "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"
+        })
 
 
 class LSF(BaseExecutor):
@@ -102,7 +130,23 @@ class LSF(BaseExecutor):
                      stdout:T.Optional[T.Path] = None, \
                      stderr:T.Optional[T.Path] = None, \
                      env:T.Optional[T.Dict[str, str]] = None) -> T.List[WorkerIdentifier]:
-        raise NOT_IMPLEMENTED
+
+        assert workers > 0
+
+        extra_args = _args_to_lsf({
+            **({"o": stdout.resolve()} if stdout is not None else {}),
+            **({"e": stderr.resolve()} if stderr is not None else {}),
+            **({"J": f"shepherd_worker[{workers}]"} if workers > 1 else {})
+            # TODO Environment variables
+        })
+
+        bsub = _run(f"bsub {options.args} {extra_args} {command}")
+
+        if bsub.returncode != 0:
+            # TODO Log stdout/stderr
+            raise CouldNotSubmit("Could not submit job to LSF")
+
+        # TODO Extract job ID from stdout
 
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:
         # NOTE This sends a specific signal, rather than the default
