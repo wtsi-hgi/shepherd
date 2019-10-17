@@ -26,6 +26,10 @@ from .time import datetime as DateTime, \
                   timedelta as TimeDelta
 
 
+# Generic identifier
+Identifier = TypeVar("Identifier")
+
+
 _T = TypeVar("_T")
 
 class Carrier(Generic[_T]):

@@ -66,7 +66,6 @@ class JobStatus:
 # track and update persisted state (maybe an ABC mixin?)
 
 
-Identifier = T.TypeVar("Identifier")
 
 class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     """
@@ -78,11 +77,11 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
     * __next__ :: () -> Task
     * status   :: () -> JobStatus
     """
-    _job_id:Identifier
+    _job_id:T.Identifier
     _filesystems:T.Dict[str, BaseFilesystem]
 
     @abstractmethod
-    def __init__(self, state:T.Any, *, job_id:T.Optional[Identifier] = None, force_restart:bool = False) -> None:
+    def __init__(self, state:T.Any, *, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
         """
         Constructor
 
@@ -92,7 +91,7 @@ class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
         """
 
     @property
-    def job_id(self) -> Identifier:
+    def job_id(self) -> T.Identifier:
         return self._job_id
 
     @abstractmethod
