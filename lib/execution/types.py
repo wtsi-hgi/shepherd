@@ -94,9 +94,8 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
         """
 
     @property
-    @staticmethod
     @abstractmethod
-    def worker_id() -> WorkerIdentifier:
+    def worker_id(self) -> WorkerIdentifier:
         """ Get the current worker identifier """
 
     @abstractmethod
