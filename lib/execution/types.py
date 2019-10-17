@@ -39,7 +39,34 @@ class NotAWorker(BaseException):
 
 
 class BaseWorkerStatus(Enum):
-    """ Base job status """
+    """
+    Abstract base job status
+
+    Implementations required:
+    * is_running    :: () -> bool
+    * is_pending    :: () -> bool
+    * is_done       :: () -> bool
+    * is_successful :: () -> bool
+    """
+    @property
+    @abstractmethod
+    def is_running(self) -> bool:
+        """ Is the worker running? """
+
+    @property
+    @abstractmethod
+    def is_pending(self) -> bool:
+        """ Is the worker pending? """
+
+    @property
+    @abstractmethod
+    def is_done(self) -> bool:
+        """ Has the worker finished? """
+
+    @property
+    @abstractmethod
+    def is_successful(self) -> bool:
+        """ Has a finished worker succeeded? """
 
 
 @dataclass
