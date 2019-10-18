@@ -50,17 +50,14 @@ strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
 def _asciify_file_name(io:IOGenerator) -> IOGenerator:
     """ Remove non-ASCII characters from target locations """
-
     valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     valid_chars += "0123456789()[]{}-_#%&+,.:;<>=@$"
 
     for source, target in io:
-
         new_address = T.Path( *[urllib.parse.quote(part, safe=valid_chars) for
             part in target.address.parts] )
 
         # TODO: What if the expanded file name is >255 chars long?
-
         new_target = Data(
             filesystem = target.filesystem,
             address    = _ROOT / new_address)
@@ -78,7 +75,6 @@ def character_translator(to_replace:str, replace_with:str) -> RouteIOTransformat
     @param  replace_with
     @return IO transformer
     """
-
     def _tr(io:IOGenerator) -> IOGenerator:
         for source, target in io:
             new_target_name = target.address.name.replace(to_replace, replace_with)
@@ -87,8 +83,7 @@ def character_translator(to_replace:str, replace_with:str) -> RouteIOTransformat
 
             new_target = Data(
                 filesystem = target.filesystem,
-                address    = target.address.parents[0] / new_target_name
-            )
+                address    = target.address.parents[0] / new_target_name)
 
             yield source, new_target
 
