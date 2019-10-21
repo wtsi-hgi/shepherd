@@ -86,7 +86,7 @@ def log(message:str, level:Level = Level.Info) -> None:
 def failure(msg:str, command:subprocess.CompletedProcess) -> None:
     """ Log critical subprocess failures in a canonical way """
     output = "\n".join(
-        f"<{stream.upper()}> {line}"
+        f"\t<{stream.upper()}>\t{line}"
         for stream in ["stdout", "stderr"]
         for line in getattr(command, stream).splitlines())
 
