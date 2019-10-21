@@ -82,6 +82,12 @@ class WorkerIdentifier:
     worker:T.Optional[int] = None
 
 
+@dataclass
+class WorkerRuntime:
+    wall:T.Optional[T.TimeDelta]  = None  # Current runtime (None if not started)
+    limit:T.Optional[T.TimeDelta] = None  # Run limit (None if unlimited)
+
+
 class BaseExecutor(T.Named, metaclass=ABCMeta):
     """
     Abstract base executor class
@@ -132,4 +138,13 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
 
         @param   worker  Worker identifier
         @return  Worker status
+        """
+
+    @abstractmethod
+    def worker_runtime(self, worker:T.Optional[WorkerIdentifier]) -> WorkerRuntime:
+        """
+        Get the runtime of a worker
+
+        @param   worker  Worker identifier
+        @return  Worker runtime
         """

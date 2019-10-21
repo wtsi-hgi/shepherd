@@ -29,10 +29,11 @@ import shlex
 import subprocess
 
 from common import types as T
+from common.exceptions import NOT_IMPLEMENTED
 from common.logging import Level, log, failure
 from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerStatus, \
                    CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
-                   WorkerIdentifier
+                   WorkerIdentifier, WorkerRuntime
 
 
 def _lsf_job_id(identifier:WorkerIdentifier) -> str:
@@ -195,3 +196,13 @@ class LSF(BaseExecutor):
             raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
 
         return LSFWorkerStatus(bjobs.stdout.strip())
+
+    def worker_runtime(self, worker:T.Optional[WorkerIdentifier] = None) -> WorkerRuntime:
+        # Get our own status, if not specified
+        if worker is None:
+            worker = self.worker_id
+
+        # TODO Is there a better way of getting the wall time of a job
+        # and the run limit of a queue than hacking the values out of
+        # bjobs and bqueues, respectively?
+        raise NOT_IMPLEMENTED
