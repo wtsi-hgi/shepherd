@@ -128,11 +128,12 @@ class LSF(BaseExecutor):
 
     def submit(self, command:str, *, \
                      options:LSFSubmissionOptions, \
-                     workers:T.Optional[int]          = 1, \
-                     worker_index:T.Optional[int]     = None, \
-                     stdout:T.Optional[T.Path]        = None, \
-                     stderr:T.Optional[T.Path]        = None, \
-                     env:T.Optional[T.Dict[str, str]] = None) -> T.List[WorkerIdentifier]:
+                     workers:T.Optional[int]                           = 1, \
+                     worker_index:T.Optional[int]                      = None, \
+                     dependencies:T.Optional[T.List[WorkerIdentifier]] = None, \
+                     stdout:T.Optional[T.Path]                         = None, \
+                     stderr:T.Optional[T.Path]                         = None, \
+                     env:T.Optional[T.Dict[str, str]]                  = None) -> T.List[WorkerIdentifier]:
 
         # Sanity check our input
         assert (workers is not None and workers > 0 and worker_index is None) \
@@ -147,6 +148,9 @@ class LSF(BaseExecutor):
 
         if worker_index is not None:
             extra_args["J"] = f"shepherd_worker[{worker_index}]"
+
+        if dependencies is not None:
+            extra_args["w"] = " && ".join(f"ended({_lsf_job_id(job_id)})" for job_id in dependencies)
 
         bsub = _run(f"bsub {options.args} {_args_to_lsf(extra_args)} {command}", env=env)
 

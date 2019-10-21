@@ -100,12 +100,12 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
     """
     @abstractmethod
     def submit(self, command:str, *, \
-                     options:BaseSubmissionOptions, \
-                     workers:T.Optional[int]          = 1, \
-                     worker_index:T.Optional[int]     = None, \
-                     stdout:T.Optional[T.Path]        = None, \
-                     stderr:T.Optional[T.Path]        = None, \
-                     env:T.Optional[T.Dict[str, str]] = None) -> T.List[WorkerIdentifier]:
+                     workers:T.Optional[int]                           = 1, \
+                     worker_index:T.Optional[int]                      = None, \
+                     dependencies:T.Optional[T.List[WorkerIdentifier]] = None, \
+                     stdout:T.Optional[T.Path]                         = None, \
+                     stderr:T.Optional[T.Path]                         = None, \
+                     env:T.Optional[T.Dict[str, str]]                  = None) -> T.List[WorkerIdentifier]:
         """
         Submit a command to the executor
 
@@ -115,6 +115,7 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
         @param   options       Submission options for the executor
         @param   workers       Number of workers (default: 1)
         @param   worker_index  Specific worker index (optional)
+        @param   dependencies  Jobs that must have finished beforehand (optional)
         @param   stdout        File to where to redirect stdout (optional)
         @param   stderr        File to where to redirect stderr (optional)
         @param   env           Environment variables for execution (optional)
