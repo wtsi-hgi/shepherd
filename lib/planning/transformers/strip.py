@@ -67,25 +67,39 @@ def _asciify_file_name(io:IOGenerator) -> IOGenerator:
 asciify_file_name = RouteIOTransformation(_asciify_file_name)
 
 
-def character_translator(to_replace:str, replace_with:str) -> RouteIOTransformation:
+def character_translator(to_replace:str, replace_with:str, name_only:bool) -> RouteIOTransformation:
     """
-    Replaces substrings 'to_replace' with 'replace_with' in the entire path.
+    Replaces substrings 'to_replace' with 'replace_with' in the entire path if
+    'name_only' is set to False, or only the file name if it's True.
 
     @param  to_replace
     @param  replace_with
+    @param  name_only If True, only translates characters in the file name. If
+        false, translates characters in the entire path.
     @return IO transformer
     """
     def _tr(io:IOGenerator) -> IOGenerator:
-        for source, target in io:
-            new_target_name = target.address.name.replace(to_replace, replace_with)
+        if(name_only):
+            for source, target in io:
+                new_target_name = target.address.name.replace(to_replace, replace_with)
 
-            # TODO: What if the new file name is >255 chars long?
+                # TODO: What if the new file name is >255 chars long?
 
-            new_target = Data(
-                filesystem = target.filesystem,
-                address    = target.address.parents[0] / new_target_name)
+                new_target = Data(
+                    filesystem = target.filesystem,
+                    address    = target.address.parents[0] / new_target_name)
 
-            yield source, new_target
+                yield source, new_target
+        else:
+            for source, target in io:
+                new_address = T.Path( *[part.replace(to_replace, replace_with)
+                    for part in target.address.parts] )
+
+                new_target = Data(
+                    filesystem  = target.filesystem,
+                    address     = _ROOT / new_address)
+
+                yield source, new_target
 
     return RouteIOTransformation(_tr)
 
