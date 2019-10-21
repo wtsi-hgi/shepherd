@@ -187,7 +187,7 @@ class LSF(BaseExecutor):
         job_id = _lsf_job_id(worker)
         bjobs  = _run(f"bjobs -noheader -o stat {job_id}")
 
-        if bjobs.returncode != 0 or bjobs.stderr is not None:
+        if bjobs.returncode != 0 or bjobs.stderr != "":
             if "not found" in bjobs.stderr:
                 raise NoSuchWorker(f"No such LSF job: {job_id}")
 
