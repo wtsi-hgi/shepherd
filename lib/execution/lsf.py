@@ -194,4 +194,4 @@ class LSF(BaseExecutor):
             failure(f"Could not address LSF job {job_id}", bjobs)
             raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
 
-        return LSFWorkerStatus(bjobs.stdout)
+        return LSFWorkerStatus(bjobs.stdout.strip())
