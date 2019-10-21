@@ -29,7 +29,6 @@ import shlex
 import subprocess
 
 from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
 from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerStatus, \
                    CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
                    WorkerIdentifier
@@ -117,6 +116,8 @@ class LSFSubmissionOptions(BaseSubmissionOptions):
             "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
 
 
+_JOB_ID = re.compile(r"(?<=Job <)\d+(?=>)")
+
 class LSF(BaseExecutor):
     """ Platform LSF executor """
     def __init__(self, name:str = "LSF") -> None:
@@ -130,11 +131,12 @@ class LSF(BaseExecutor):
                      env:T.Optional[T.Dict[str, str]] = None) -> T.List[WorkerIdentifier]:
 
         assert workers > 0
+        nontrivial = workers > 1
 
         extra_args = _args_to_lsf({
             **({"o": stdout.resolve()} if stdout is not None else {}),
             **({"e": stderr.resolve()} if stderr is not None else {}),
-            **({"J": f"shepherd_worker[{workers}]"} if workers > 1 else {})})
+            **({"J": f"shepherd_worker[1-{workers}]"} if nontrivial else {})})
 
         bsub = _run(f"bsub {options.args} {extra_args} {command}", env=env)
 
@@ -142,7 +144,15 @@ class LSF(BaseExecutor):
             # TODO Log stdout/stderr
             raise CouldNotSubmit("Could not submit job to LSF")
 
-        # TODO Extract job ID from stdout
+        id_search = _JOB_ID.search(bsub.stdout)
+        if id_search is None:
+            # TODO Log stdout/stderr
+            raise CouldNotSubmit("Could not submit job to LSF")
+
+        # Workers in LSF are elements of an array job, if we have >1
+        job_id = id_search.group()
+        worker_ids = range(1, workers + 1) if nontrivial else [None]
+        return [WorkerIdentifier(job_id, worker_id) for worker_id in worker_ids]
 
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:
         # NOTE This sends a specific signal, rather than the default
