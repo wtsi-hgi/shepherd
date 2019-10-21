@@ -29,6 +29,7 @@ import shlex
 import subprocess
 
 from common import types as T
+from common.logging import Level, log, failure
 from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerStatus, \
                    CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
                    WorkerIdentifier
@@ -45,6 +46,7 @@ def _lsf_job_id(identifier:WorkerIdentifier) -> str:
 
 def _run(command:str, *, env:T.Optional[T.Dict[str, str]] = None) -> subprocess.CompletedProcess:
     """ Wrapper for running commands """
+    log(f"Running: {command}", Level.Debug)
     return subprocess.run(
         shlex.split(command), env=env,
         capture_output=True, check=False, text=True)
@@ -64,7 +66,7 @@ class LSFWorkerStatus(BaseWorkerStatus):
 
     @classmethod
     def _missing_(cls:LSFWorkerStatus, value:str) -> LSFWorkerStatus:
-        # TODO Log unrecognised status
+        log(f"Unrecognised LSF status \"{value}\"; converting to UNKNOWN")
         return LSFWorkerStatus.Unknown
 
     @property
@@ -141,12 +143,12 @@ class LSF(BaseExecutor):
         bsub = _run(f"bsub {options.args} {extra_args} {command}", env=env)
 
         if bsub.returncode != 0:
-            # TODO Log stdout/stderr
+            failure("Could not submit job to LSF", bsub)
             raise CouldNotSubmit("Could not submit job to LSF")
 
         id_search = _JOB_ID.search(bsub.stdout)
         if id_search is None:
-            # TODO Log stdout/stderr
+            failure("Could not submit job to LSF", bsub)
             raise CouldNotSubmit("Could not submit job to LSF")
 
         # Workers in LSF are elements of an array job, if we have >1
@@ -164,7 +166,7 @@ class LSF(BaseExecutor):
             if "No matching job found" in bkill.stderr:
                 raise NoSuchWorker(f"No such LSF job: {job_id}")
 
-            # TODO Log stderr
+            failure(f"Could not address LSF job {job_id}", bkill)
             raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
 
     @property
@@ -189,7 +191,7 @@ class LSF(BaseExecutor):
             if "not found" in bjobs.stderr:
                 raise NoSuchWorker(f"No such LSF job: {job_id}")
 
-            # TODO Log stderr
+            failure(f"Could not address LSF job {job_id}", bjobs)
             raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
 
         return LSFWorkerStatus(bjobs.stdout)
