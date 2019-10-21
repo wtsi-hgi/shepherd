@@ -128,20 +128,27 @@ class LSF(BaseExecutor):
 
     def submit(self, command:str, *, \
                      options:LSFSubmissionOptions, \
-                     workers:int = 1, \
-                     stdout:T.Optional[T.Path] = None, \
-                     stderr:T.Optional[T.Path] = None, \
+                     workers:T.Optional[int]          = 1, \
+                     worker_index:T.Optional[int]     = None, \
+                     stdout:T.Optional[T.Path]        = None, \
+                     stderr:T.Optional[T.Path]        = None, \
                      env:T.Optional[T.Dict[str, str]] = None) -> T.List[WorkerIdentifier]:
 
-        assert workers > 0
-        nontrivial = workers > 1
+        # Sanity check our input
+        assert (workers is not None and workers > 0 and worker_index is None) \
+            or (workers is None and worker_index is not None and worker_index > 1)
 
-        extra_args = _args_to_lsf({
+        extra_args:T.Dict[str, T.Any] = {
             **({"o": stdout.resolve()} if stdout is not None else {}),
-            **({"e": stderr.resolve()} if stderr is not None else {}),
-            **({"J": f"shepherd_worker[1-{workers}]"} if nontrivial else {})})
+            **({"e": stderr.resolve()} if stderr is not None else {})}
 
-        bsub = _run(f"bsub {options.args} {extra_args} {command}", env=env)
+        if workers is not None:
+            extra_args["J"] = f"shepherd_worker[1-{workers}]"
+
+        if worker_index is not None:
+            extra_args["J"] = f"shepherd_worker[{worker_index}]"
+
+        bsub = _run(f"bsub {options.args} {_args_to_lsf(extra_args)} {command}", env=env)
 
         if bsub.returncode != 0:
             failure("Could not submit job to LSF", bsub)
@@ -154,7 +161,7 @@ class LSF(BaseExecutor):
 
         # Workers in LSF are elements of an array job, if we have >1
         job_id = id_search.group()
-        worker_ids = range(1, workers + 1) if nontrivial else [None]
+        worker_ids = range(1, workers + 1) if workers is not None else [worker_index]
         return [WorkerIdentifier(job_id, worker_id) for worker_id in worker_ids]
 
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:

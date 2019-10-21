@@ -101,21 +101,26 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
     @abstractmethod
     def submit(self, command:str, *, \
                      options:BaseSubmissionOptions, \
-                     workers:int = 1, \
-                     stdout:T.Optional[T.Path] = None, \
-                     stderr:T.Optional[T.Path] = None, \
+                     workers:T.Optional[int]          = 1, \
+                     worker_index:T.Optional[int]     = None, \
+                     stdout:T.Optional[T.Path]        = None, \
+                     stderr:T.Optional[T.Path]        = None, \
                      env:T.Optional[T.Dict[str, str]] = None) -> T.List[WorkerIdentifier]:
         """
         Submit a command to the executor
 
-        @param   command  Command to execute
-        @param   options  Submission options for the executor
-        @param   workers  Number of workers (default: 1)
-        @param   stdout   File to where to redirect stdout (optional)
-        @param   stderr   File to where to redirect stderr (optional)
-        @param   env      Environment variables for execution (optional)
+        NOTE workers OR worker_index must be specified, but not both
+
+        @param   command       Command to execute
+        @param   options       Submission options for the executor
+        @param   workers       Number of workers (default: 1)
+        @param   worker_index  Specific worker index (optional)
+        @param   stdout        File to where to redirect stdout (optional)
+        @param   stderr        File to where to redirect stderr (optional)
+        @param   env           Environment variables for execution (optional)
         @return  List of worker identifiers
         """
+        # FIXME The workers/worker_index thing is not a nice interface
 
     @abstractmethod
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:
