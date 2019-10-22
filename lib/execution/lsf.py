@@ -29,11 +29,11 @@ import shlex
 import subprocess
 
 from common import types as T, time
-from common.exceptions import NOT_IMPLEMENTED
 from common.logging import Level, log, failure
-from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerStatus, \
-                   SubmissionException, CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
-                   WorkerIdentifier, WorkerRuntime
+from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerContext, BaseWorkerStatus, \
+                   ExecutionException, SubmissionException, WorkerException, \
+                   CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
+                   WorkerIdentifier
 
 
 def _lsf_job_id(identifier:WorkerIdentifier) -> str:
@@ -45,12 +45,112 @@ def _lsf_job_id(identifier:WorkerIdentifier) -> str:
 
     return job_id
 
+def _args_to_lsf(arguments:T.Dict[str, T.Any]) -> str:
+    """ Helper to generate LSF-style command line options """
+    # Map convenience fields to LSF flags
+    mapping = {
+        "cores":  "n",
+        "memory": "M",
+        "queue":  "q",
+        "group":  "G"}
+
+    return " ".join(
+        f"-{mapping.get(arg, arg)} \"{val}\""
+        for arg, val in arguments.items()
+        if val is not None)
+
 def _run(command:str, *, env:T.Optional[T.Dict[str, str]] = None) -> subprocess.CompletedProcess:
     """ Wrapper for running commands """
     log(f"Running: {command}", Level.Debug)
     return subprocess.run(
         shlex.split(command), env=env,
         capture_output=True, check=False, text=True)
+
+
+@dataclass
+class LSFSubmissionOptions(BaseSubmissionOptions):
+    # TODO This is currently pared down to what we're interested in
+    queue:T.Optional[str]  = None
+    group:T.Optional[str]  = None
+    cwd:T.Optional[T.Path] = None
+
+    @property
+    def args(self) -> str:
+        """ Generate the bsub arguments from submission options """
+        return _args_to_lsf({
+            **asdict(self),
+            "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
+
+
+@dataclass
+class LSFQueue:
+    name:str
+    runlimit:T.Optional[T.TimeDelta] = None
+    # TODO Other queue properties...
+
+    @staticmethod
+    def parse_config(config:T.Path) -> T.Dict[str, LSFQueue]:
+        """
+        Parse lsb.queues file to extract queue configuration
+
+        @param   config  Path to lsb.queues
+        @return  Dictionary of parsed queue configurations
+        """
+        comment = re.compile(r"^\s*#")
+        begin   = re.compile(r"Begin Queue")
+        end     = re.compile(r"End Queue")
+        setting = re.compile(r"(?P<key>\w+)\s*=\s*(?P<value>.+)\s*$")
+
+        queues = {}
+
+        def _parse_runlimit(value:str) -> T.TimeDelta:
+            if value.isnumeric():
+                return time.delta(minutes=int(value))
+
+            # TODO In Python 3.8, use the new walrus operator
+            hhmm = re.search(r"(?P<hours>\d+):(?P<minutes>\d{2})", value)
+            return time.delta(hours=int(hhmm["hours"]), minutes=int(hhmm["minutes"]))
+
+        mapping = {
+            "QUEUE_NAME": ("name",     None),
+            "RUNLIMIT":   ("runlimit", _parse_runlimit)}
+
+        in_queue_def = False
+        this_queue:T.Dict[str, T.Any] = {}
+        with config.open(mode="rt") as f:
+            for line in f:
+                if comment.match(line):
+                    continue
+
+                if begin.search(line):
+                    in_queue_def = True
+                    continue
+
+                if end.search(line):
+                    in_queue_def = False
+
+                    name         = this_queue["name"]
+                    queues[name] = LSFQueue(**this_queue)
+                    this_queue   = {}
+
+                    continue
+
+                # TODO In Python 3.8, use the new walrus operator
+                option = setting.search(line)
+                if in_queue_def and option is not None:
+                    key, value = option["key"], option["value"]
+
+                    if key in mapping:
+                        mapped_key, value_mapper = mapping[key]
+                        this_queue[mapped_key] = (value_mapper or str)(value)
+
+        return queues
+
+
+@dataclass
+class LSFWorkerContext(BaseWorkerContext):
+    # FIXME This is a tight-coupling to LSF
+    queue:LSFQueue
 
 
 class LSFWorkerStatus(BaseWorkerStatus):
@@ -64,6 +164,8 @@ class LSFWorkerStatus(BaseWorkerStatus):
     Unknown          = "UNKWN"
     Waiting          = "WAIT"
     Zombified        = "ZOMBI"
+
+    _context:LSFWorkerContext
 
     @classmethod
     def _missing_(cls:LSFWorkerStatus, value:str) -> LSFWorkerStatus:
@@ -87,112 +189,24 @@ class LSFWorkerStatus(BaseWorkerStatus):
     def is_successful(self) -> bool:
         return self == LSFWorkerStatus.Succeeded
 
-
-# Map convenience fields to LSF flags
-_MAPPING = {
-    "cores":  "n",
-    "memory": "M",
-    "queue":  "q",
-    "group":  "G"
-}
-
-def _args_to_lsf(arguments:T.Dict[str, T.Any]) -> str:
-    """ Helper to generate LSF-style command line options """
-    return " ".join(
-        f"-{_MAPPING.get(arg, arg)} \"{val}\""
-        for arg, val in arguments.items()
-        if val is not None)
-
-
-@dataclass
-class LSFSubmissionOptions(BaseSubmissionOptions):
-    # TODO This is currently pared down to what we're interested in
-    queue:T.Optional[str]  = None
-    group:T.Optional[str]  = None
-    cwd:T.Optional[T.Path] = None
-
     @property
-    def args(self) -> str:
-        """ Generate the bsub arguments from submission options """
-        return _args_to_lsf({
-            **asdict(self),
-            "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
+    def context(self) -> LSFWorkerContext:
+        return self._context
 
-
-@dataclass
-class _LSFQueue:
-    name:str
-    runlimit:T.Optional[T.TimeDelta] = None
-    # TODO Other queue properties...
-
-    @staticmethod
-    def parse_config(config:T.Path) -> T.Dict[str, _LSFQueue]:
-        """
-        Parse lsb.queues file to extract queue configuration
-
-        @param   config  Path to lsb.queues
-        @return  Dictionary of parsed queue configurations
-        """
-        comment = re.compile(r"^\s*#")
-        begin   = re.compile(r"Begin Queue")
-        end     = re.compile(r"End Queue")
-        setting = re.compile(r"(?P<key>\w+)\s*=\s*(?P<value>.+)\s*$")
-
-        queues = {}
-
-        def _parse_runlimit(value:str) -> T.TimeDelta:
-            if value.isnumeric():
-                return time.delta(minutes=int(value))
-
-            # TODO In Python 3.8, use the new walrus operator
-            hhmm = re.search(r"(?P<hours>\d+):(?P<minutes>\d{2})", value)
-            return time.delta(hours=int(hhmm["hours"]), minutes=int(hhmm["minutes"]))
-
-        config_mapping = {
-            "QUEUE_NAME": ("name",     None),
-            "RUNLIMIT":   ("runlimit", _parse_runlimit)}
-
-        in_queue_def = False
-        this_queue:T.Dict[str, T.Any] = {}
-        with config.open(mode="rt") as f:
-            for line in f:
-                if comment.match(line):
-                    continue
-
-                if begin.search(line):
-                    in_queue_def = True
-                    continue
-
-                if end.search(line):
-                    in_queue_def = False
-
-                    name         = this_queue["name"]
-                    queues[name] = _LSFQueue(**this_queue)
-                    this_queue   = {}
-
-                    continue
-
-                # TODO In Python 3.8, use the new walrus operator
-                option = setting.search(line)
-                if in_queue_def and option is not None:
-                    key, value = option["key"], option["value"]
-
-                    if key in config_mapping:
-                        mapped_key, value_mapper = config_mapping[key]
-                        this_queue[mapped_key] = (value_mapper or str)(value)
-
-        return queues
+    @context.setter
+    def context(self, value:LSFWorkerContext) -> None:
+        self._context = value
 
 
 _JOB_ID = re.compile(r"(?<=Job <)\d+(?=>)")
 
 class LSF(BaseExecutor):
     """ Platform LSF executor """
-    _queues:T.Dict[str, _LSFQueue]
+    _queues:T.Dict[str, LSFQueue]
 
     def __init__(self, config_dir:T.Path, name:str = "LSF") -> None:
         self._name   = name
-        self._queues = _LSFQueue.parse_config(config_dir / "lsb.queues")
+        self._queues = LSFQueue.parse_config(config_dir / "lsb.queues")
 
     def submit(self, command:str, *, \
                      options:LSFSubmissionOptions, \
@@ -270,7 +284,7 @@ class LSF(BaseExecutor):
             worker = self.worker_id
 
         job_id = _lsf_job_id(worker)
-        bjobs  = _run(f"bjobs -noheader -o stat {job_id}")
+        bjobs  = _run(f"bjobs -noheader -o 'stat queue delimiter=\":\"' {job_id}")
 
         if bjobs.returncode != 0 or bjobs.stderr != "":
             if "not found" in bjobs.stderr:
@@ -279,13 +293,8 @@ class LSF(BaseExecutor):
             failure(f"Could not address LSF job {job_id}", bjobs)
             raise CouldNotAddressWorker(f"Could not address LSF job {job_id}")
 
-        return LSFWorkerStatus(bjobs.stdout.strip())
+        status, queue = bjobs.stdout.strip().split(":")
+        worker_status = LSFWorkerStatus(status)
+        worker_status.context = LSFWorkerContext(queue=self._queues[queue])
 
-    def worker_runtime(self, worker:T.Optional[WorkerIdentifier] = None) -> WorkerRuntime:
-        # Get our own status, if not specified
-        if worker is None:
-            worker = self.worker_id
-
-        # TODO Is there a better way of getting the wall time of a job
-        # than hacking the values out of bjobs?
-        raise NOT_IMPLEMENTED
+        return worker_status

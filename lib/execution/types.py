@@ -47,15 +47,22 @@ class NotAWorker(WorkerException):
     """ Raised when worker-specific invocations are made against non-workers """
 
 
+@dataclass
+class BaseWorkerContext:
+    """ Base worker context model """
+
+
 class BaseWorkerStatus(Enum):
     """
     Abstract base job status
 
     Implementations required:
-    * is_running    :: () -> bool
-    * is_pending    :: () -> bool
-    * is_done       :: () -> bool
-    * is_successful :: () -> bool
+    * is_running     :: () -> bool
+    * is_pending     :: () -> bool
+    * is_done        :: () -> bool
+    * is_successful  :: () -> bool
+    * context        :: () -> BaseWorkerContext
+    * context.setter :: BaseWorkerContext -> None
     """
     @property
     @abstractmethod
@@ -77,6 +84,16 @@ class BaseWorkerStatus(Enum):
     def is_successful(self) -> bool:
         """ Has a finished worker succeeded? """
 
+    @property
+    @abstractmethod
+    def context(self) -> BaseWorkerContext:
+        """ Return the worker runtime context """
+
+    @context.setter
+    @abstractmethod
+    def context(self, value:BaseWorkerContext) -> None:
+        """ Set the worker runtime context """
+
 
 @dataclass
 class BaseSubmissionOptions:
@@ -87,14 +104,9 @@ class BaseSubmissionOptions:
 
 @dataclass
 class WorkerIdentifier:
+    """ Worker identifier model """
     job:T.Identifier
     worker:T.Optional[int] = None
-
-
-@dataclass
-class WorkerRuntime:
-    wall:T.Optional[T.TimeDelta]  = None  # Current runtime (None if not started)
-    limit:T.Optional[T.TimeDelta] = None  # Run limit (None if unlimited)
 
 
 class BaseExecutor(T.Named, metaclass=ABCMeta):
@@ -153,13 +165,4 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
 
         @param   worker  Worker identifier
         @return  Worker status
-        """
-
-    @abstractmethod
-    def worker_runtime(self, worker:T.Optional[WorkerIdentifier]) -> WorkerRuntime:
-        """
-        Get the runtime of a worker
-
-        @param   worker  Worker identifier
-        @return  Worker runtime
         """
