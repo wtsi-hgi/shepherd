@@ -28,11 +28,11 @@ import re
 import shlex
 import subprocess
 
-from common import types as T
+from common import types as T, time
 from common.exceptions import NOT_IMPLEMENTED
 from common.logging import Level, log, failure
 from .types import BaseSubmissionOptions, BaseExecutor, BaseWorkerStatus, \
-                   CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
+                   SubmissionException, CouldNotSubmit, NoSuchWorker, CouldNotAddressWorker, NotAWorker, \
                    WorkerIdentifier, WorkerRuntime
 
 
@@ -119,12 +119,80 @@ class LSFSubmissionOptions(BaseSubmissionOptions):
             "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
 
 
+@dataclass
+class _LSFQueue:
+    name:str
+    runlimit:T.Optional[T.TimeDelta] = None
+    # TODO Other queue properties...
+
+    @staticmethod
+    def parse_config(config:T.Path) -> T.Dict[str, _LSFQueue]:
+        """
+        Parse lsb.queues file to extract queue configuration
+
+        @param   config  Path to lsb.queues
+        @return  Dictionary of parsed queue configurations
+        """
+        comment = re.compile(r"^\s*#")
+        begin   = re.compile(r"Begin Queue")
+        end     = re.compile(r"End Queue")
+        setting = re.compile(r"(?P<key>\w+)\s*=\s*(?P<value>.+)\s*$")
+
+        queues = {}
+
+        def _parse_runlimit(value:str) -> T.TimeDelta:
+            if value.isnumeric():
+                return time.delta(minutes=int(value))
+
+            # TODO In Python 3.8, use the new walrus operator
+            hhmm = re.search(r"(?P<hours>\d+):(?P<minutes>\d{2})", value)
+            return time.delta(hours=int(hhmm["hours"]), minutes=int(hhmm["minutes"]))
+
+        config_mapping = {
+            "QUEUE_NAME": ("name",     None),
+            "RUNLIMIT":   ("runlimit", _parse_runlimit)}
+
+        in_queue_def = False
+        this_queue:T.Dict[str, T.Any] = {}
+        with config.open(mode="rt") as f:
+            for line in f:
+                if comment.match(line):
+                    continue
+
+                if begin.search(line):
+                    in_queue_def = True
+                    continue
+
+                if end.search(line):
+                    in_queue_def = False
+
+                    name         = this_queue["name"]
+                    queues[name] = _LSFQueue(**this_queue)
+                    this_queue   = {}
+
+                    continue
+
+                # TODO In Python 3.8, use the new walrus operator
+                option = setting.search(line)
+                if in_queue_def and option is not None:
+                    key, value = option["key"], option["value"]
+
+                    if key in config_mapping:
+                        mapped_key, value_mapper = config_mapping[key]
+                        this_queue[mapped_key] = (value_mapper or str)(value)
+
+        return queues
+
+
 _JOB_ID = re.compile(r"(?<=Job <)\d+(?=>)")
 
 class LSF(BaseExecutor):
     """ Platform LSF executor """
-    def __init__(self, name:str = "LSF") -> None:
-        self._name = name
+    _queues:T.Dict[str, _LSFQueue]
+
+    def __init__(self, config_dir:T.Path, name:str = "LSF") -> None:
+        self._name   = name
+        self._queues = _LSFQueue.parse_config(config_dir / "lsb.queues")
 
     def submit(self, command:str, *, \
                      options:LSFSubmissionOptions, \
@@ -136,8 +204,13 @@ class LSF(BaseExecutor):
                      env:T.Optional[T.Dict[str, str]]                  = None) -> T.List[WorkerIdentifier]:
 
         # Sanity check our input
+        # TODO Change this from an assertion to raising a SubmissionException
         assert (workers is not None and workers > 0 and worker_index is None) \
             or (workers is None and worker_index is not None and worker_index > 1)
+
+        if options.queue is not None:
+            if options.queue not in self._queues:
+                raise SubmissionException(f"No such LSF queue \"{options.queue}\"")
 
         extra_args:T.Dict[str, T.Any] = {
             **({"o": stdout.resolve()} if stdout is not None else {}),
@@ -214,6 +287,5 @@ class LSF(BaseExecutor):
             worker = self.worker_id
 
         # TODO Is there a better way of getting the wall time of a job
-        # and the run limit of a queue than hacking the values out of
-        # bjobs and bqueues, respectively?
+        # than hacking the values out of bjobs?
         raise NOT_IMPLEMENTED
