@@ -25,16 +25,25 @@ from signal import SIGTERM
 from common import types as T
 
 
-class CouldNotSubmit(BaseException):
+class ExecutionException(BaseException):
+    """ Base execution exception """
+
+class SubmissionException(ExecutionException):
+    """ Base submission exception """
+
+class CouldNotSubmit(SubmissionException):
     """ Raised when a submission failed """
 
-class NoSuchWorker(BaseException):
+class WorkerException(ExecutionException):
+    """ Base worker exception """
+
+class NoSuchWorker(WorkerException):
     """ Raised when a worker cannot be dereferenced """
 
-class CouldNotAddressWorker(BaseException):
+class CouldNotAddressWorker(WorkerException):
     """ Raised when a worker cannot be addressed """
 
-class NotAWorker(BaseException):
+class NotAWorker(WorkerException):
     """ Raised when worker-specific invocations are made against non-workers """
 
 
