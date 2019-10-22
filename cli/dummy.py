@@ -25,11 +25,18 @@ from lib.planning.transformers import strip_common_prefix, last_n_components, pr
 from lib.planning.route_factories import posix_to_irods_factory
 from lib.state.types import JobStatus, DataNotReady, WorkerRedundant
 from lib.state.native import NativeJob, create_root
+from lib.execution.lsf import LSF
 
 
 _FS = {
     "Lustre": POSIXFilesystem(name="Lustre", max_concurrency=50),
     "iRODS":  iRODSFilesystem(name="iRODS")
+}
+
+_EXEC = {
+    # "farm3": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm3/configdir"), name="farm3")
+    # "farm4": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm4/configdir"), name="farm4")
+    "farm5": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm5/configdir"), name="farm5")
 }
 
 
