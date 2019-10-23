@@ -70,7 +70,7 @@ def main(*args:str) -> None:
     delegate[mode](*mode_args)
 
 
-def submit(fofn:str) -> None:
+def submit(fofn:str, prefix:str) -> None:
     # Create working directory
     state_root = create_root(T.Path("."))
 
@@ -83,7 +83,7 @@ def submit(fofn:str) -> None:
 
     log_file = state_root / "prep.log"
     prep, *_ = lsf.submit(
-        f"\"{_BINARY}\" __fofn \"{state_root}\" \"{fofn}\"",
+        f"\"{_BINARY}\" __fofn \"{state_root}\" \"{fofn}\" \"{prefix}\"",
         options = lsf_options,
         stdout  = log_file,
         stderr  = log_file)
@@ -92,11 +92,11 @@ def submit(fofn:str) -> None:
     log(f"State and logs will reside in {state_root}")
 
 
-def prepare_state_from_fofn(state_root:str, fofn:str) -> None:
+def prepare_state_from_fofn(state_root:str, fofn:str, prefix:str) -> None:
     """ Lustre to iRODS state from FoFN """
     transfer = posix_to_irods_factory(_FS["Lustre"], _FS["iRODS"])
     transfer += strip_common_prefix
-    transfer += prefix(T.Path("/humgen/shepherd_testing"))
+    transfer += prefix(T.Path(f"/humgen/shepherd_testing/{prefix}"))
     transfer += debugging
     transfer += telemetry
 
