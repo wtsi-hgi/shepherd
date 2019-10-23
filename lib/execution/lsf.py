@@ -79,7 +79,7 @@ class LSFSubmissionOptions(BaseSubmissionOptions):
         """ Generate the bsub arguments from submission options """
         return _args_to_lsf({
             **asdict(self),
-            "R": f"span[ptile=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
+            "R": f"span[hosts=1] select[mem>{self.memory}] rusage[mem={self.memory}]"})
 
 
 @dataclass

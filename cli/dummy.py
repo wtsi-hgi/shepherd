@@ -129,7 +129,7 @@ def prepare_state_from_fofn(state_root:str, fofn:str, subcollection:str) -> None
 
     lsf = _EXEC[_CLUSTER]
     lsf_options = LSFSubmissionOptions(
-        cores  = 1,
+        cores  = 4,
         memory = 1000,
         group  = "hgi",
         queue  = "long")
