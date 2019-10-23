@@ -230,7 +230,7 @@ class LSF(BaseExecutor):
             **({"o": stdout.resolve()} if stdout is not None else {}),
             **({"e": stderr.resolve()} if stderr is not None else {})}
 
-        if workers is not None:
+        if workers is not None and workers > 1:
             extra_args["J"] = f"shepherd_worker[1-{workers}]"
 
         if worker_index is not None:
