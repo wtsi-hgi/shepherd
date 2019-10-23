@@ -239,7 +239,8 @@ class NativeJob(BaseJob):
 
     @worker_index.setter
     def worker_index(self, value:int) -> None:
-        self._worker_index = value
+        # FIXME? Should this modulo be done here or by the client?
+        self._worker_index = value % self.max_concurrency
 
     def _job_params(self) -> T.Tuple[int, int]:
         with self._db as conn:
