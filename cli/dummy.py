@@ -92,11 +92,11 @@ def submit(fofn:str, prefix:str) -> None:
     log(f"State and logs will reside in {state_root}")
 
 
-def prepare_state_from_fofn(state_root:str, fofn:str, prefix:str) -> None:
+def prepare_state_from_fofn(state_root:str, fofn:str, subcollection:str) -> None:
     """ Lustre to iRODS state from FoFN """
     transfer = posix_to_irods_factory(_FS["Lustre"], _FS["iRODS"])
     transfer += strip_common_prefix
-    transfer += prefix(T.Path(f"/humgen/shepherd_testing/{prefix}"))
+    transfer += prefix(T.Path(f"/humgen/shepherd_testing/{subcollection}"))
     transfer += debugging
     transfer += telemetry
 
