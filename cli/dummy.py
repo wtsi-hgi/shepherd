@@ -18,15 +18,19 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from time import sleep
+import sys
 
 from common import types as T
+from common.logging import log, Level
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
-from lib.planning.transformers import strip_common_prefix, last_n_components, prefix, telemetry, debugging
+from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
 from lib.planning.route_factories import posix_to_irods_factory
 from lib.state.types import JobStatus, DataNotReady, WorkerRedundant
 from lib.state.native import NativeJob, create_root
-from lib.execution.lsf import LSF
+from lib.execution.lsf import LSF, LSFSubmissionOptions
 
+
+_BINARY = T.Path(sys.argv[0]).resolve()
 
 _FS = {
     "Lustre": POSIXFilesystem(name="Lustre", max_concurrency=50),
@@ -35,77 +39,130 @@ _FS = {
 
 _EXEC = {
     # "farm3": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm3/configdir"), name="farm3")
-    # "farm4": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm4/configdir"), name="farm4")
-    "farm5": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm5/configdir"), name="farm5")
+    "farm4": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm4/configdir"), name="farm4")
+    # "farm5": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm5/configdir"), name="farm5")
 }
 
-
-def print_status(status:JobStatus) -> None:
-    print(f"* Pending:   {status.pending}")
-    print(f"* Running:   {status.running}")
-    print(f"* Failed:    {status.failed}")
-    print(f"* Succeeded: {status.succeeded}")
+_CLUSTER = "farm4"
 
 
-def create_state_from_fofn(fofn:T.Path) -> None:
+def _print_status(status:JobStatus) -> None:
+    log(f"* Pending:   {status.pending}")
+    log(f"* Running:   {status.running}")
+    log(f"* Failed:    {status.failed}")
+    log(f"* Succeeded: {status.succeeded}")
+
+
+def main(*args:str) -> None:
+    mode, *mode_args = args
+
+    delegate = {
+        "submit": submit,
+        "__fofn": prepare_state_from_fofn,
+        "__exec": run_state}
+
+    if mode not in delegate:
+        user_modes = ", ".join(mode for mode in delegate if not mode.startswith("__"))
+        log(f"No such mode \"{mode}\"", Level.Critical)
+        log(f"Valid user modes: {user_modes}")
+        exit(1)
+
+    delegate[mode](*mode_args)
+
+
+def submit(fofn:str) -> None:
+    # Create working directory
+    state_root = create_root(T.Path("."))
+
+    lsf = _EXEC[_CLUSTER]
+    lsf_options = LSFSubmissionOptions(
+        cores  = 1,
+        memory = 1000,
+        group  = "hgi",
+        queue  = "normal")
+
+    log_file = state_root / "prep.log"
+    prep, *_ = lsf.submit(
+        f"\"{_BINARY}\" __fofn \"{state_root}\" \"{fofn}\"",
+        options = lsf_options,
+        stdout  = log_file,
+        stderr  = log_file)
+
+    log(f"Preparation job submitted with ID {prep.job}")
+    log(f"State and logs will reside in {state_root}")
+
+
+def prepare_state_from_fofn(state_root:str, fofn:str) -> None:
     """ Lustre to iRODS state from FoFN """
     transfer = posix_to_irods_factory(_FS["Lustre"], _FS["iRODS"])
     transfer += strip_common_prefix
-    transfer += prefix(T.Path("/here/is/a/prefix/for/humgen/shepherd_testing"))
-    transfer += last_n_components(4)
+    transfer += prefix(T.Path("/humgen/shepherd_testing"))
     transfer += debugging
     transfer += telemetry
 
-    state_root = create_root(T.Path("."))
-    job = NativeJob(state_root)
+    job = NativeJob(T.Path(state_root))
     job.filesystem_mapping = _FS
 
     # FIXME the maximum concurrency is a property of the filesystems
     # involved in a task, rather than that of an entire job...
     job.max_concurrency = min(fs.max_concurrency for fs in _FS.values())
 
-    print(f"State:            {state_root}")
-    print(f"Job ID:           {job.job_id}")
-    print(f"Max. Attempts:    {job.max_attempts}")
-    print(f"Max. Concurrency: {job.max_concurrency}")
+    log(f"State:            {state_root}")
+    log(f"Job ID:           {job.job_id}")
+    log(f"Max. Attempts:    {job.max_attempts}")
+    log(f"Max. Concurrency: {job.max_concurrency}")
 
     tasks = 0
-    files = _FS["Lustre"]._identify_by_fofn(fofn)
+    files = _FS["Lustre"]._identify_by_fofn(T.Path(fofn))
     for task in transfer.plan(files):
-        print(("=" if tasks == 0 else "-") * 72)
+        log(("=" if tasks == 0 else "-") * 72)
 
         job += task
         tasks += 1
 
-        print(f"Source: {task.source.filesystem} {task.source.address}")
-        print(f"Target: {task.target.filesystem} {task.target.address}")
+        log(f"Source: {task.source.filesystem} {task.source.address}")
+        log(f"Target: {task.target.filesystem} {task.target.address}")
 
-    print("=" * 72)
-    print(f"Added {tasks} tasks to job:")
-    print_status(job.status)
+    log("=" * 72)
+    log(f"Added {tasks} tasks to job:")
+    _print_status(job.status)
+
+    lsf = _EXEC[_CLUSTER]
+    lsf_options = LSFSubmissionOptions(
+        cores  = 1,
+        memory = 1000,
+        group  = "hgi",
+        queue  = "long")
+
+    log_file = T.Path(state_root) / "run.%I.log"
+    runners = lsf.submit(
+        f"\"{_BINARY}\" __exec \"{state_root}\" \"{job.job_id}\"",
+        workers = job.max_concurrency,
+        options = lsf_options,
+        stdout  = log_file,
+        stderr  = log_file)
+
+    log(f"Execution job submitted with ID {runners[0].job} and {len(runners)} workers")
 
 
-def run_state(state_root:str, job_id:int, worker_index:T.Optional[int] = None) -> None:
+def run_state(state_root:str, job_id:str) -> None:
     """ Run through tasks in state database """
-    job = NativeJob(T.Path(state_root), job_id=job_id, force_restart=True)
+    job = NativeJob(T.Path(state_root), job_id=int(job_id), force_restart=True)
     job.filesystem_mapping = _FS
 
-    print(f"State:            {state_root}")
-    print(f"Job ID:           {job.job_id}")
-    print(f"Max. Attempts:    {job.max_attempts}")
-    print(f"Max. Concurrency: {job.max_concurrency}")
+    log(f"State:         {state_root}")
+    log(f"Job ID:        {job.job_id}")
+    log(f"Max. Attempts: {job.max_attempts}")
 
-    if worker_index is not None:
-        worker_index = int(worker_index)
-        assert 0 < worker_index <= job.max_concurrency, "Worker index out of bounds"
-        job.worker_index = worker_index
-        print(f"Worker ID:        {worker_index}")
+    lsf = _EXEC[_CLUSTER]
+    job.worker_index = worker_index = lsf.worker_id.worker
+    log(f"Worker:        {worker_index} of {job.max_concurrency}")
 
     try:
-        print_status(job.status)
+        _print_status(job.status)
 
     except WorkerRedundant:
-        print("* Worker has nothing to do; terminating.")
+        log("Worker has nothing to do; terminating")
         exit(0)
 
     tasks = 0
@@ -117,34 +174,19 @@ def run_state(state_root:str, job_id:int, worker_index:T.Optional[int] = None) -
             break
 
         except DataNotReady:
-            print("Not ready; sleeping...")
+            log("Not ready; sleeping...")
             sleep(60)
             continue
 
-        print(("=" if tasks == 0 else "-") * 72)
-        print(f"Source: {task.source.filesystem} {task.source.address}")
-        print(f"Target: {task.target.filesystem} {task.target.address}")
+        log(("=" if tasks == 0 else "-") * 72)
+        log(f"Source: {task.source.filesystem} {task.source.address}")
+        log(f"Target: {task.target.filesystem} {task.target.address}")
 
         # TODO Check exit status and update state
         task()
 
         tasks += 1
 
-    print("=" * 72)
-    print("Done")
-    print_status(job.status)
-
-
-def main(*args:str) -> None:
-    mode, *mode_args = args
-
-    delegate = {
-        "fofn": create_state_from_fofn,
-        "exec": run_state
-    }
-
-    if mode not in delegate:
-        print(f"No such mode {mode}!")
-        exit(1)
-
-    delegate[mode](*mode_args)
+    log("=" * 72)
+    log("Done")
+    _print_status(job.status)
