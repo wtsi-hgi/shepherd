@@ -48,7 +48,7 @@ def _strip_common_prefix(io:IOGenerator) -> IOGenerator:
 
 strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
-def _asciify_file_name(io:IOGenerator) -> IOGenerator:
+def _percent_encode(io:IOGenerator) -> IOGenerator:
     """ Remove non-ASCII characters from target locations """
     valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     valid_chars += "0123456789()[]{}-_#%&+,.:;<>=@$"
@@ -64,7 +64,7 @@ def _asciify_file_name(io:IOGenerator) -> IOGenerator:
 
         yield source, new_target
 
-asciify_file_name = RouteIOTransformation(_asciify_file_name)
+percent_encode = RouteIOTransformation(_percent_encode)
 
 
 def character_translator(to_replace:str, replace_with:str, name_only:bool) -> RouteIOTransformation:
