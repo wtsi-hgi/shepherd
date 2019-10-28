@@ -40,14 +40,16 @@ class OptionalArgument(_Argument):
     """ Optional argument model """
 
 
+Instance = T.TypeVar("Instance")
+
 @dataclass
 class API:
     """ Model for API calls """
     # TODO It would be neat if the arguments could be discerned
     # automatically by introspection
-    callable:T.Callable
+    callable:T.Callable[..., Instance]
     arguments:T.Optional[T.List[_Argument]] = None
     help:T.Optional[str] = None
 
-    def __call__(self, **kwargs):
+    def __call__(self, **kwargs) -> Instance:
         return self.callable(**kwargs)
