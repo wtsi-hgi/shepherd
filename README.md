@@ -100,15 +100,19 @@ transformations:
   - [transformer]
   # etc.
 template: [path | template]
+cost: [int]
 ```
 
 The `name` provides a reference, if used later in a [named
 route](#named-routes). The `source` and `target`
 [filesystems](#filesystems) must be defined, with `template` taking
-either the path to a templated script, or the script itself, to perform
-the [transfer](#transfer-template). The list of `transformations` is
-optional and are applied to the transfer route in the order in which
-they are presented.
+either the path to a templated script, or the inlined script itself, to
+perform the [transfer](#transfer-template). The list of
+`transformations` is optional and are applied to the transfer route in
+the order in which they are presented. The optional `cost` is the degree
+of polynomial, temporal complexity for the transfer (i.e., the k in
+O(n^k), where n ranges over the number of files), which defaults to 1
+(i.e., linear time).
 
 **Note** While transfer routes can have transformers applied to them,
 they cannot be parametrised. They are considered fixed.
@@ -155,7 +159,7 @@ routes](#transfer-routes), which must have the property that:
 
     route[n + 1].source == route[n].target
 
-...for n>0.
+...for n > 0.
 
 The list of `transformations` for each part of the route is optional and
 the value for their options can be templated using Jinja2 syntax. All
