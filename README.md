@@ -6,17 +6,36 @@ as necessary -- in parallel, over a distributed environment.
 
 ## CLI Tool
 
-<!-- TODO -->
+The standard usage pattern takes a routing clause and a targeting query:
 
-    shepherd help
-    shepherd [OPTIONS] QUERY
-    shepherd [OPTIONS] --route=ROUTE [ROUTE OPTIONS]
+    shepherd [OPTIONS] ROUTING QUERY
+
+These are described herein. Otherwise, help is always available with:
+
+    shepherd [OPTIONS] help [SUBJECT]
+
+<!-- TODO: More operation modes, such as reporting, restarting, etc. -->
 
 ### Automatic Routing
 
-<!-- TODO -->
+The routing clause for automatic routing takes the form:
+
+    from FILESYSTEM to FILESYSTEM
+
+Where each `FILESYSTEM` is [defined](#filesystems) in the `shepherd`
+configuration. Provided there is a valid [route](#transfer-routes)
+between these two filesystems, then `shepherd` will follow it;
+otherwise, the process will fail.
 
 ### Named Routes
+
+The routing clause for [named routes](#named-routes) takes the form:
+
+    through ROUTE
+
+Where `ROUTE` is a valid named route in the `shepherd` configuration.
+
+### Targeting Query
 
 <!-- TODO -->
 
@@ -187,11 +206,9 @@ route:
 ```
 
 **Note** The `route` is a list of defined [transfer
-routes](#transfer-routes), which must have the property that:
+routes](#transfer-routes), which must have the property that, for n > 0:
 
     route[n + 1].source == route[n].target
-
-...for n > 0.
 
 The list of `transformations` for each part of the route is optional and
 the value for their options can be templated using Jinja2 syntax. All
