@@ -29,7 +29,7 @@ otherwise, the process will fail.
 
 ### Named Routes
 
-The routing clause for [named routes](#named-routes) takes the form:
+The routing clause for [named routes](#named-routes-1) takes the form:
 
     through ROUTE
 
@@ -154,7 +154,7 @@ cost: [int]
 ```
 
 The `name` provides a reference, if used later in a [named
-route](#named-routes). The `source` and `target`
+route](#named-routes-1). The `source` and `target`
 [filesystems](#filesystems) must be defined, with `template` taking
 either the path to a templated script, or the inlined script itself, to
 perform the [transfer](#transfer-template). The list of
