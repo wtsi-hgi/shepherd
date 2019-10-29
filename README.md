@@ -40,6 +40,35 @@ that has been previously consumed.
 available, at the same paths, on all the nodes of your distributed
 environment.
 
+#### Templating
+
+The `shepherd` configuration may contain templated values, using
+[Jinja2](https://palletsprojects.com/p/jinja/) syntax. These will be
+reified at runtime using values for template variables taken from the
+following sources, in the given precedence:
+
+1. Command line arguments, which can be specified multiple times:
+
+       -v VARIABLE=VALUE
+
+2. Environment variables, prefixed with `SHEPHERD_`;
+
+3. Variable definition YAML files, specified as command line arguments,
+   which again may be specified multiple times:
+
+       --variables=/path/to/variables.yml
+
+When the same variable is defined in multiple sources, then the most
+recent will be taken from the highest priority source, per the above.
+
+**Note** Any variables that are used in templates, but _not_ specified
+at runtime will result in error. All used variables _must_ be defined.
+
+For the list of used variables, for the given configuration, and
+available Jinja2 filters, see:
+
+    shepherd help templating
+
 #### `.shepherdrc`
 
 <!-- TODO -->
@@ -87,6 +116,8 @@ can be found with:
 
     shepherd help transformers
 
+The `value` for each parameter may be templated using Jinja2 syntax.
+
 ##### Transfer Routes
 
 The list of valid transfer routes is specified under the `transfers`
@@ -111,18 +142,21 @@ perform the [transfer](#transfer-template). The list of
 `transformations` is optional and are applied to the transfer route in
 the order in which they are presented. The optional `cost` is the degree
 of polynomial, temporal complexity for the transfer (i.e., the k in
-O(n^k), where n ranges over the number of files), which defaults to 1
+O(n<sup>k</sup>), where n ranges over the number of files), which defaults to 1
 (i.e., linear time).
 
-**Note** While transfer routes can have transformers applied to them,
-they cannot be parametrised. They are considered fixed.
+<!-- TODO
+A visualisation of the complete transfer graph can be obtained with:
+
+    shepherd help transfers
+-->
 
 ##### Transfer Template
 
-The transfer template is a [Jinja2](https://palletsprojects.com/p/jinja/)
-templated script that will be run over each file to perform the specific
-transfer. It has available to it two variables -- `source` and `target`
--- which have attributes of `address` and `filesystem`.
+The transfer template is a Jinja2 templated script that will be run over
+each file to perform the specific transfer. It has available to it two
+special variables -- `source` and `target` -- which have attributes of
+`address` and `filesystem`.
 
 For example:
 
@@ -132,17 +166,15 @@ echo "Copying from {{ source.filesystem }} to {{ target.filesystem }}"
 cp "{{ source.address | sh_escape }}" "{{ target.address | sh_escape }}"
 ```
 
-For a list of template filters, see:
-
-    shepherd help templating
+The [full spectrum of template variables and filters](#templating) will
+also be available.
 
 ##### Named Routes
 
 Named routes are specific routes through the transfer graph to perform a
 defined action. They allow each part of the route to be further
-augmented with parametrisable transformations, which can be controlled
-from the command line. They take the schema, under the `named_routes`
-name:
+augmented with additional, parametrisable transformations. They take the
+schema, under the `named_routes` name:
 
 ```yaml
 name: [string]
@@ -163,8 +195,8 @@ routes](#transfer-routes), which must have the property that:
 
 The list of `transformations` for each part of the route is optional and
 the value for their options can be templated using Jinja2 syntax. All
-variables used in the route will be passed in from the environment and
-command line (with the latter taking precedence).
+variables used in the route will be passed in at runtime and _must_ be
+specified.
 
 For example, the following named route:
 
@@ -182,13 +214,13 @@ named_routes:
 
 ...could be invoked with:
 
-    export prefix_dir="some_backup"
-    shepherd --route=backup backup_date="$(date +%Ymd)" /path/to/backup
+    export SHEPHERD_prefix_dir="some_backup"
+    shepherd -v backup_date="$(date +%Ymd)" through backup take /path/to/backup
 
-A list of named routes and their parametrised variables can be found
-with:
+A list of named routes and their parametrisable variables, for the given
+configuration, can be found with:
 
-    shepherd help named_routes
+    shepherd help routes
 
 ## Library
 
