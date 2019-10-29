@@ -117,7 +117,7 @@ class Edge(T.Carrier[T.Any], T.Container[Vertex], CostBearing):
 Route = T.List[Edge]
 
 class Graph(T.Container[Vertex]):
-    """ Graph abstract base class """
+    """ Graph model """
     # NOTE Our graph is a container of edges; contrary to definition, we
     # do not consider unconnected vertices to be in the graph
     _edges:T.List[Edge]
