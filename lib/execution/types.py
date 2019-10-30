@@ -26,21 +26,21 @@ from common import types as T
 
 
 @dataclass
-class BaseWorkerContext:
-    """ Base worker context model """
+class WorkerIdentifier:
+    """ Worker identifier model """
+    job:T.Identifier
+    worker:T.Optional[int] = None
 
 
 class BaseWorkerStatus(Enum):
     """
-    Abstract base job status
+    Abstract base worker status
 
     Implementations required:
     * is_running     :: () -> bool
     * is_pending     :: () -> bool
     * is_done        :: () -> bool
     * is_successful  :: () -> bool
-    * context        :: () -> BaseWorkerContext
-    * context.setter :: BaseWorkerContext -> None
     """
     @property
     @abstractmethod
@@ -62,15 +62,18 @@ class BaseWorkerStatus(Enum):
     def is_successful(self) -> bool:
         """ Has a finished worker succeeded? """
 
+
+class BaseWorkerContext(metaclass=ABCMeta):
+    """ Base worker context model """
     @property
     @abstractmethod
-    def context(self) -> BaseWorkerContext:
-        """ Return the worker runtime context """
+    def id(self) -> WorkerIdentifier:
+        """ Get the worker identifier """
 
-    @context.setter
+    @property
     @abstractmethod
-    def context(self, value:BaseWorkerContext) -> None:
-        """ Set the worker runtime context """
+    def status(self) -> BaseWorkerStatus:
+        """ Get the worker status """
 
 
 @dataclass
@@ -80,22 +83,14 @@ class BaseSubmissionOptions:
     memory:int
 
 
-@dataclass
-class WorkerIdentifier:
-    """ Worker identifier model """
-    job:T.Identifier
-    worker:T.Optional[int] = None
-
-
 class BaseExecutor(T.Named, metaclass=ABCMeta):
     """
     Abstract base executor class
 
     Implementations required:
-    * submit        :: <lots> -> List[WorkerIdentifier]
-    * signal        :: WorkerIdentifier x int -> None
-    * worker_id     :: () -> WorkerIdentifier
-    * worker_status :: worker -> BaseWorkerStatus
+    * submit :: <lots> -> List[WorkerIdentifier]
+    * signal :: WorkerIdentifier x int -> None
+    * worker :: () -> BaseWorkerContext
     """
     @abstractmethod
     def submit(self, command:str, *, \
@@ -133,14 +128,5 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def worker_id(self) -> WorkerIdentifier:
-        """ Get the current worker identifier """
-
-    @abstractmethod
-    def worker_status(self, worker:T.Optional[WorkerIdentifier] = None) -> BaseWorkerStatus:
-        """
-        Get the status of a worker
-
-        @param   worker  Worker identifier
-        @return  Worker status
-        """
+    def worker(self) -> BaseWorkerContext:
+        """ Get the current worker context, if applicable """
