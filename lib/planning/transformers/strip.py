@@ -18,6 +18,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from os.path import commonpath
+import urllib.parse
 
 from common import types as T
 from common.models.filesystems.types import Data
@@ -47,6 +48,60 @@ def _strip_common_prefix(io:IOGenerator) -> IOGenerator:
 
 strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
+def _percent_encode(io:IOGenerator) -> IOGenerator:
+    """ Remove non-ASCII characters from target locations """
+    valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    valid_chars += "0123456789()[]{}-_#%&+,.:;<>=@$"
+
+    for source, target in io:
+        new_address = T.Path( *[urllib.parse.quote(part, safe=valid_chars) for
+            part in target.address.parts] )
+
+        # TODO: What if the expanded file name is >255 chars long?
+        new_target = Data(
+            filesystem = target.filesystem,
+            address    = _ROOT / new_address)
+
+        yield source, new_target
+
+percent_encode = RouteIOTransformation(_percent_encode)
+
+
+def character_translator(to_replace:str, replace_with:str, name_only:bool) -> RouteIOTransformation:
+    """
+    Replaces substrings 'to_replace' with 'replace_with' in the entire path if
+    'name_only' is set to False, or only the file name if it's True.
+
+    @param  to_replace
+    @param  replace_with
+    @param  name_only If True, only translates characters in the file name. If
+        false, translates characters in the entire path.
+    @return IO transformer
+    """
+    def _tr(io:IOGenerator) -> IOGenerator:
+        if(name_only):
+            for source, target in io:
+                new_target_name = target.address.name.replace(to_replace, replace_with)
+
+                # TODO: What if the new file name is >255 chars long?
+
+                new_target = Data(
+                    filesystem = target.filesystem,
+                    address    = target.address.parents[0] / new_target_name)
+
+                yield source, new_target
+        else:
+            for source, target in io:
+                new_address = T.Path( *[part.replace(to_replace, replace_with)
+                    for part in target.address.parts] )
+
+                new_target = Data(
+                    filesystem  = target.filesystem,
+                    address     = _ROOT / new_address)
+
+                yield source, new_target
+
+    return RouteIOTransformation(_tr)
 
 def last_n_components(n:int) -> RouteIOTransformation:
     """
