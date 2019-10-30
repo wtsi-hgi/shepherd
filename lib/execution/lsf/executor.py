@@ -31,7 +31,7 @@ from . import utils, queue
 from .context import LSFWorkerContext
 from .queue import LSFQueue
 from ..exceptions import *
-from ..types import BaseSubmissionOptions, BaseExecutor, WorkerIdentifier
+from ..types import BaseSubmissionOptions, BaseExecutor, Job, WorkerIdentifier
 
 
 # Map convenience fields to LSF flags
@@ -72,48 +72,38 @@ class LSF(BaseExecutor):
 
     def __init__(self, config_dir:T.Path, name:str = "LSF") -> None:
         self._name = name
-
         self._queues = {
             q.name: q
             for q in queue.parse_config(config_dir / "lsb.queues")}
 
-    def submit(self, command:str, *, \
-                     options:LSFSubmissionOptions, \
-                     workers:T.Optional[int]                           = 1, \
-                     worker_index:T.Optional[int]                      = None, \
-                     dependencies:T.Optional[T.List[WorkerIdentifier]] = None, \
-                     stdout:T.Optional[T.Path]                         = None, \
-                     stderr:T.Optional[T.Path]                         = None, \
-                     env:T.Optional[T.Dict[str, str]]                  = None) -> T.List[WorkerIdentifier]:
-
-        # Sanity check our input
-        # TODO Change this from an assertion to raising a SubmissionException
-        assert (workers is not None and workers > 0 and worker_index is None) \
-            or (workers is None and worker_index is not None and worker_index > 1)
-
-        if options.queue is not None:
-            if options.queue not in self._queues:
-                raise SubmissionException(f"No such LSF queue \"{options.queue}\"")
+    def submit(self, job:Job, options:LSFSubmissionOptions) -> T.Iterator[WorkerIdentifier]:
+        if options.queue is not None and options.queue not in self._queues:
+            raise SubmissionException(f"No such LSF queue \"{options.queue}\"")
 
         extra_args:T.Dict[str, T.Any] = {
-            **({"o": stdout.resolve()} if stdout is not None else {}),
-            **({"e": stderr.resolve()} if stderr is not None else {})}
+            **({"o": job.stdout.resolve()} if job.stdout is not None else {}),
+            **({"e": job.stderr.resolve()} if job.stderr is not None else {})}
 
-        if workers is not None and workers > 1:
-            extra_args["J"] = f"shepherd_worker[1-{workers}]"
+        if job.workers is not None and job.workers > 1:
+            extra_args["J"] = f"shepherd_worker[1-{job.workers}]"
 
-        if worker_index is not None:
-            extra_args["J"] = f"shepherd_worker[{worker_index}]"
+        if job.specific_worker is not None:
+            extra_args["J"] = f"shepherd_worker[{job.specific_worker}]"
 
-        if dependencies is not None:
-            extra_args["w"] = " && ".join(f"ended({utils.lsf_job_id(job_id)})" for job_id in dependencies)
+        dependency_expr = " && ".join(
+            f"ended({utils.lsf_job_id(job_id)})"
+            for job_id in job.dependencies)
 
-        bsub = utils.run(f"bsub {options.args} {_args_to_lsf(extra_args)} {command}", env=env)
+        if dependency_expr:
+            extra_args["w"] = dependency_expr
+
+        bsub = utils.run(f"bsub {options.args} {_args_to_lsf(extra_args)} {job.command}", env=job.env)
 
         if bsub.returncode != 0:
             failure("Could not submit job to LSF", bsub)
             raise CouldNotSubmit("Could not submit job to LSF")
 
+        # TODO In Python 3.8, use the new walrus operator
         id_search = _JOB_ID.search(bsub.stdout)
         if id_search is None:
             failure("Could not submit job to LSF", bsub)
@@ -121,8 +111,9 @@ class LSF(BaseExecutor):
 
         # Workers in LSF are elements of an array job, if we have >1
         job_id = id_search.group()
-        worker_ids = range(1, workers + 1) if workers is not None else [worker_index]
-        return [WorkerIdentifier(job_id, worker_id) for worker_id in worker_ids]
+        worker_ids = range(1, job.workers + 1) if job.workers is not None else [job.specific_worker]
+        for worker_id in worker_ids:
+            yield WorkerIdentifier(job_id, worker_id)
 
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:
         # NOTE This sends a specific signal, rather than the default
