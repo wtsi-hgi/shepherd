@@ -22,7 +22,7 @@ from common.models.api import API, RequiredArgument, OptionalArgument
 
 # API endpoints
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
-from lib.execution.lsf import LSF
+#from lib.execution.lsf import LSF
 from lib.planning import transformers as transformer
 from lib.state.native import NativeJob
 
@@ -60,16 +60,16 @@ filesystems:_Registrations = {
     )
 }
 
-executors:_Registrations = {
-    "LSF": API(
-        callable=LSF,
-        arguments=[
-            RequiredArgument("name", str, default="LSF", help="Name for the executor"),
-            RequiredArgument("config_dir", T.Path, help="Directory of the LSF cluster configuration")
-        ],
-        help="LSF executor"
-    )
-}
+#executors:_Registrations = {
+#    "LSF": API(
+#        callable=LSF,
+#        arguments=[
+#            RequiredArgument("name", str, default="LSF", help="Name for the executor"),
+#            RequiredArgument("config_dir", T.Path, help="Directory of the LSF cluster configuration")
+#        ],
+#        help="LSF executor"
+#    )
+#}
 
 transformers:_Registrations = {
     "prefix": API(
@@ -89,6 +89,19 @@ transformers:_Registrations = {
             RequiredArgument("n", int, help="Maximum number of components to keep from the end")
         ],
         help="Take path components from the end of the target files"
+    ),
+    "percent_encode": API(
+        callable=transformer.percent_encode,
+        help="Convert potentially problematic characters to percent-encoded representation"
+    ),
+    "character_translate": API(
+        callable=transformer.character_translator,
+        arguments=[
+            RequiredArgument("to_replace", str, help="Substring to replace"),
+            RequiredArgument("replace_with", str, help="Substring to replace with"),
+            RequiredArgument("name_only", bool, help="If true, replace only characters in file name. Otherwise replace characters in entire path.")
+        ],
+        help="Find and replace substrings in paths of target files"
     ),
     "telemetry": API(
         callable=transformer.telemetry,
