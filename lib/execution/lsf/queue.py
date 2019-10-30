@@ -53,17 +53,15 @@ _MAPPING = {
     "QUEUE_NAME": ("name",     None),
     "RUNLIMIT":   ("runlimit", _parse_runlimit)}
 
-def parse_config(config:T.Path) -> T.Dict[str, LSFQueue]:
+def parse_config(config:T.Path) -> T.Iterator[LSFQueue]:
     """
     Parse lsb.queues file to extract queue configuration
 
     @param   config  Path to lsb.queues
-    @return  Dictionary of parsed queue parameters
+    @return  Generator of parsed queues
     """
-    queues = {}
-
     in_queue_def = False
-    this_queue:T.Dict[str, T.Any] = {}
+    queue_config:T.Dict[str, T.Any] = {}
     with config.open(mode="rt") as f:
         for line in f:
             if _COMMENT.match(line):
@@ -76,9 +74,8 @@ def parse_config(config:T.Path) -> T.Dict[str, LSFQueue]:
             if _END.search(line):
                 in_queue_def = False
 
-                name         = this_queue["name"]
-                queues[name] = LSFQueue(**this_queue)
-                this_queue   = {}
+                yield LSFQueue(**queue_config)
+                queue_config = {}
 
                 continue
 
@@ -89,6 +86,4 @@ def parse_config(config:T.Path) -> T.Dict[str, LSFQueue]:
 
                 if key in _MAPPING:
                     mapped_key, value_mapper = _MAPPING[key]
-                    this_queue[mapped_key] = (value_mapper or str)(value)
-
-    return queues
+                    queue_config[mapped_key] = (value_mapper or str)(value)

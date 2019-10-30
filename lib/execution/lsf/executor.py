@@ -27,9 +27,9 @@ import re
 
 from common import types as T
 from common.logging import failure
-from . import utils
+from . import utils, queue
 from .context import LSFWorkerContext
-from .queue import LSFQueue, parse_config
+from .queue import LSFQueue
 from ..exceptions import *
 from ..types import BaseSubmissionOptions, BaseExecutor, WorkerIdentifier
 
@@ -71,8 +71,11 @@ class LSF(BaseExecutor):
     _queues:T.Dict[str, LSFQueue]
 
     def __init__(self, config_dir:T.Path, name:str = "LSF") -> None:
-        self._name   = name
-        self._queues = parse_config(config_dir / "lsb.queues")
+        self._name = name
+
+        self._queues = {
+            q.name: q
+            for q in queue.parse_config(config_dir / "lsb.queues")}
 
     def submit(self, command:str, *, \
                      options:LSFSubmissionOptions, \
