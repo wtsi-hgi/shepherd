@@ -98,8 +98,7 @@ def produce_transformation(data:T.Dict[str, T.Any]):
 
     option_dict:T.Dict[str, T.Any] = {}
     for option in options:
-        if len(options[option]) > 1:
-            raise InvalidConfigurationError(f"Transformation option {option} can't have a list of values.")
+        # TODO: verify each option is a simple key:value pair
 
         value = options[option]
 
@@ -134,6 +133,8 @@ def produce_transfer(data:T.Dict[str, T.Any], filesystems:T.Dict[str, T.Any]) ->
         except FileNotFoundError:
             raise InvalidConfigurationError(f"Template script {template} not found. If the template is supposed to be inline code, make sure to start it with an interpreter directive such as '#!/bin/env bash'.")
     else:
+        # if the template is inline code, dump it to a temporary file and pass
+        # its path
         with NamedTemporaryFile() as temp_file:
             temp_file.write(bytes(template, "UTF-8"))
             template = transfer_script(load_template(T.Path(temp_file.name)))

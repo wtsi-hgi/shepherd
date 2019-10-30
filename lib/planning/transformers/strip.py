@@ -18,7 +18,6 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from os.path import commonpath
-import urllib.parse
 
 from common import types as T
 from common.models.filesystems.types import Data
