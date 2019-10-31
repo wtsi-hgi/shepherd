@@ -17,12 +17,21 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+# We need postponed annotation evaluation for our recursive definitions
+# https://docs.python.org/3/whatsnew/3.7.html#pep-563-postponed-evaluation-of-annotations
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from signal import SIGTERM
 
 from common import types as T
+
+
+# NOTE (FIXME?) The BaseWorkerStatus and, to a lesser extent, Job
+# classes bear a similarity to counterparts in lib.state.types. Am I
+# missing an abstraction here?...
 
 
 @dataclass
@@ -77,6 +86,57 @@ class BaseWorkerContext(metaclass=ABCMeta):
 
 
 @dataclass
+class _BaseJob:
+    """ Base job attributes """
+    command:str
+    stdout:T.Optional[T.Path]        = None
+    stderr:T.Optional[T.Path]        = None
+    env:T.Optional[T.Dict[str, str]] = None
+
+class Job(_BaseJob):
+    """ Job model """
+    _dependencies:T.List[WorkerIdentifier]
+    _specific_worker:bool
+    _worker:int
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._dependencies = []
+        self._specific_worker = False
+        self._worker = 1
+
+    def __iadd__(self, dependency:WorkerIdentifier) -> Job:
+        """ Add dependency """
+        self._dependencies.append(dependency)
+        return self
+
+    @property
+    def dependencies(self) -> T.Iterator[WorkerIdentifier]:
+        """ Generator of dependencies """
+        for d in self._dependencies:
+            yield d
+
+    @property
+    def workers(self) -> T.Optional[int]:
+        return None if self._specific_worker else self._worker
+
+    @workers.setter
+    def workers(self, value:int) -> None:
+        self._specific_worker = False
+        self._worker = value
+
+    @property
+    def specific_worker(self) -> T.Optional[int]:
+        return self._worker if self._specific_worker else None
+
+    @specific_worker.setter
+    def specific_worker(self, value:int) -> None:
+        self._specific_worker = True
+        self._worker = value
+
+
+@dataclass
 class BaseSubmissionOptions:
     """ Base resource model """
     cores:int
@@ -88,34 +148,19 @@ class BaseExecutor(T.Named, metaclass=ABCMeta):
     Abstract base executor class
 
     Implementations required:
-    * submit :: <lots> -> List[WorkerIdentifier]
+    * submit :: Job x BaseSubmissionOptions -> Iterator[WorkerIdentifier]
     * signal :: WorkerIdentifier x int -> None
     * worker :: () -> BaseWorkerContext
     """
     @abstractmethod
-    def submit(self, command:str, *, \
-                     workers:T.Optional[int]                           = 1, \
-                     worker_index:T.Optional[int]                      = None, \
-                     dependencies:T.Optional[T.List[WorkerIdentifier]] = None, \
-                     stdout:T.Optional[T.Path]                         = None, \
-                     stderr:T.Optional[T.Path]                         = None, \
-                     env:T.Optional[T.Dict[str, str]]                  = None) -> T.List[WorkerIdentifier]:
+    def submit(self, job:Job, options:BaseSubmissionOptions) -> T.Iterator[WorkerIdentifier]:
         """
-        Submit a command to the executor
+        Submit a job to the executor
 
-        NOTE workers OR worker_index must be specified, but not both
-
-        @param   command       Command to execute
-        @param   options       Submission options for the executor
-        @param   workers       Number of workers (default: 1)
-        @param   worker_index  Specific worker index (optional)
-        @param   dependencies  Jobs that must have finished beforehand (optional)
-        @param   stdout        File to where to redirect stdout (optional)
-        @param   stderr        File to where to redirect stderr (optional)
-        @param   env           Environment variables for execution (optional)
-        @return  List of worker identifiers
+        @param   job      Job to execute
+        @param   options  Submission options for the executor
+        @return  Generator of worker identifiers
         """
-        # FIXME The workers/worker_index thing is not a nice interface
 
     @abstractmethod
     def signal(self, worker:WorkerIdentifier, signum:int = SIGTERM) -> None:

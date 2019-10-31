@@ -27,6 +27,13 @@ from lib.planning import transformers as transformer
 from lib.state.native import NativeJob
 
 
+# NOTE The API class is a Callable and used to wrap callables, such as
+# functions and classes, in order to expose them -- with argument
+# definitions and help -- to userland. However, if you wish to refer to
+# the callable directly (i.e., rather than calling it), then use its
+# callable attribute.
+
+
 _Registrations = T.Dict[str, API]
 
 state:_Registrations = {

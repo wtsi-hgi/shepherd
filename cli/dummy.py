@@ -27,6 +27,7 @@ from lib.planning.transformers import strip_common_prefix, prefix, telemetry, de
 from lib.planning.route_factories import posix_to_irods_factory
 from lib.state.types import JobStatus, DataNotReady, WorkerRedundant
 from lib.state.native import NativeJob, create_root
+from lib.execution.types import Job
 from lib.execution.lsf import LSF, LSFSubmissionOptions
 
 
@@ -37,13 +38,12 @@ _FS = {
     "iRODS":  iRODSFilesystem(name="iRODS")
 }
 
+_CLUSTER = "farm4"
+
 _EXEC = {
-    # "farm3": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm3/configdir"), name="farm3")
-    "farm4": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm4/configdir"), name="farm4")
-    # "farm5": LSF(T.Path("/usr/local/lsf/conf/lsbatch/farm5/configdir"), name="farm5")
+    _CLUSTER: LSF(T.Path(f"/usr/local/lsf/conf/lsbatch/{_CLUSTER}/configdir"), name=_CLUSTER)
 }
 
-_CLUSTER = "farm4"
 
 
 def _print_status(status:JobStatus) -> None:
@@ -81,12 +81,10 @@ def submit(fofn:str, prefix:str) -> None:
         group  = "hgi",
         queue  = "normal")
 
-    log_file = state_root / "prep.log"
-    prep, *_ = lsf.submit(
-        f"\"{_BINARY}\" __fofn \"{state_root}\" \"{fofn}\" \"{prefix}\"",
-        options = lsf_options,
-        stdout  = log_file,
-        stderr  = log_file)
+    worker = Job(f"\"{_BINARY}\" __fofn \"{state_root}\" \"{fofn}\" \"{prefix}\"")
+    worker.stdout = worker.stderr = state_root / "prep.log"
+
+    prep, *_ = lsf.submit(worker, lsf_options)
 
     log(f"Preparation job submitted with ID {prep.job}")
     log(f"State and logs will reside in {state_root}")
@@ -134,13 +132,11 @@ def prepare_state_from_fofn(state_root:str, fofn:str, subcollection:str) -> None
         group  = "hgi",
         queue  = "long")
 
-    log_file = T.Path(state_root) / "run.%I.log"
-    runners = lsf.submit(
-        f"\"{_BINARY}\" __exec \"{state_root}\" \"{job.job_id}\"",
-        workers = job.max_concurrency,
-        options = lsf_options,
-        stdout  = log_file,
-        stderr  = log_file)
+    worker = Job(f"\"{_BINARY}\" __exec \"{state_root}\" \"{job.job_id}\"")
+    worker.workers = job.max_concurrency
+    worker.stdout = worker.stderr = T.Path(state_root) / "run.%I.log"
+
+    runners = list(lsf.submit(worker, lsf_options))
 
     log(f"Execution job submitted with ID {runners[0].job} and {len(runners)} workers")
 
@@ -155,7 +151,7 @@ def run_state(state_root:str, job_id:str) -> None:
     log(f"Max. Attempts: {job.max_attempts}")
 
     lsf = _EXEC[_CLUSTER]
-    job.worker_index = worker_index = lsf.worker_id.worker
+    job.worker_index = worker_index = lsf.worker.id.worker
     log(f"Worker:        {worker_index} of {job.max_concurrency}")
 
     try:
