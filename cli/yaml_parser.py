@@ -20,6 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 from yaml import load, FullLoader
 from tempfile import NamedTemporaryFile
 from common import types as T
+from common.models.graph import Route
 from lib import api
 from lib.planning.types import TransferRoute, PolynomialComplexity
 from lib.planning.templating import transfer_script, load_template
@@ -86,7 +87,7 @@ def produce_transformation(data:T.Dict[str, T.Any]):
         opts = False
 
     if not opts:
-        return api.transformers[name]()
+        return api.transformers[name].callable
 
     valid_options:T.Dict[str, T.Type] = {}
     # finds names and types of all defined options for the transformation
@@ -148,12 +149,12 @@ def produce_transfer(data:T.Dict[str, T.Any], filesystems:T.Dict[str, T.Any]) ->
     try:
         option_dict["target"] = filesystems[data["target"]]
     except KeyError:
-        raise InvalidConfigurationError(f"Transfer target named {data['target']} not found in filesystems list.")
+        raise InvalidConfigurationError(f"Transfer target named {data['target']} not defined in filesystems list.")
 
     try:
         option_dict["cost"] = int(data["cost"])
         if option_dict["cost"] < 0:
-            InvalidConfigurationError(f"Cost of transfer {data['name']} can't be less than 0.")
+            raise InvalidConfigurationError(f"Cost of transfer {data['name']} can't be less than 0.")
     except KeyError:
         # cost is optional, just ignore it if it isn't present
         pass
@@ -164,6 +165,33 @@ def produce_transfer(data:T.Dict[str, T.Any], filesystems:T.Dict[str, T.Any]) ->
         transfer_object += produce_transformation(transformation)
 
     return transfer_object
+
+def produce_route(data:T.Dict[str, T.Any], transfers:T.Dict[str, T.Any]) -> T.Any:
+    """Takes a config dictionary describing a route object, returns an object
+    with those parameters."""
+    name = data["name"]
+
+    route:Route = []
+
+    valid_transfers:T.List[str] = []
+    for transfer in transfers:
+        valid_transfers.append(transfer)
+
+    for step in data["route"]:
+        if step["name"] not in valid_transfers:
+            raise InvalidConfigurationError(f"Named route step named {step['name']} not defined in transfers list.")
+
+        transfer = transfers[step["name"]]
+        try:
+            for transformation in step["transformations"]:
+                transfer += produce_transformation(transformation)
+        except KeyError:
+            # no transformations defined, just move on
+            pass
+
+        route.append(transfer)
+
+    return route
 
 def read_yaml(yaml_file:T.Path) -> T.Dict[str, T.Any]:
     """
@@ -182,30 +210,31 @@ def read_yaml(yaml_file:T.Path) -> T.Dict[str, T.Any]:
 
         filesystems = {}
         transfers = {}
+        routes = {}
+
+        for entry in data["filesystems"]:
+            name = entry["name"]
+            filesystems[name] = produce_filesystem(entry)
+
+        if len(filesystems) == 0:
+            raise InvalidConfigurationError("No filesystems defined!")
+
+        for entry in data["transfers"]:
+            name = entry["name"]
+            transfers[name] = produce_transfer(entry, filesystems)
+
+        if len(transfers) == 0:
+            raise InvalidConfigurationError("No transfers defined!")
+
+        for entry in data["named_routes"]:
+            name = entry["name"]
+            routes[name] = produce_route(entry, transfers)
 
         for key in data:
-            if key == "filesystems":
-                if len(filesystems) > 0:
-                    raise InvalidConfigurationError("Multiple 'filesystems' categories defined! Combine them into a single list.")
-
-                for entry in data["filesystems"]:
-                    name = entry["name"]
-                    filesystems[name] = produce_filesystem(entry)
-
-            elif key == "transfers":
-                if len(filesystems) == 0:
-                    raise InvalidConfigurationError("No filesystems defined, or filesystem definitions placed after transfer definitions!")
-
-                for entry in data["transfers"]:
-                    name = entry["name"]
-                    transfers[name] = produce_transfer(entry, filesystems)
-
-            elif key == "named_routes":
-                pass
-
-            else:
-                raise InvalidConfigurationError(f"Option category {key} not recognised!")
+            if key not in ("filesystems", "transfers", "named_routes"):
+                raise InvalidConfigurationError(f"Unrecognised definition '{key}' found in configuration file!")
 
     object_dict["filesystems"] = filesystems
     object_dict["transfers"] = transfers
+    object_dict["named_routes"] = routes
     return object_dict
