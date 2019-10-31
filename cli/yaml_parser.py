@@ -1,7 +1,7 @@
 """
 Copyright (c) 2019 Genome Research Limited
 
-Author: Christopher Harrison <ch12@sanger.ac.uk>
+Author: Filip Makosza <fm12@sanger.ac.uk>
 
 This program is free software: you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -18,6 +18,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from yaml import safe_load, FullLoader
+
 from tempfile import NamedTemporaryFile
 from common import types as T
 from common.models.graph import Route
@@ -232,7 +233,7 @@ def read_yaml(yaml_file:T.Path) -> T.Dict[str, T.Any]:
 
         for key in data:
             if key not in ("filesystems", "transfers", "named_routes"):
-                raise InvalidConfigurationError(f"Unrecognised definition '{key}' found in configuration file!")
+                raise InvalidConfigurationError(f"Unrecognised category definition '{key}' in configuration file!")
 
     object_dict["filesystems"] = filesystems
     object_dict["transfers"] = transfers
