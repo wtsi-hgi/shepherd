@@ -23,7 +23,7 @@ from tempfile import NamedTemporaryFile
 from common import types as T
 from common.models.graph import Route
 from lib import api
-from lib.planning.types import TransferRoute, PolynomialComplexity
+from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 from lib.planning.templating import transfer_script, load_template
 
 class InvalidConfigurationError(BaseException):
@@ -135,25 +135,22 @@ def produce_transfer(data:T.Dict[str, T.Any], filesystems:T.Dict[str, T.Any]) ->
         except FileNotFoundError:
             raise InvalidConfigurationError(f"Template script {template} not found. If the template is supposed to be inline code, make sure to start it with an interpreter directive such as '#!/bin/env bash'.")
     else:
-        # if the template is inline code, dump it to a temporary file and pass
-        # its path
-        with NamedTemporaryFile() as temp_file:
-            temp_file.write(bytes(template, "UTF-8"))
-            template = transfer_script(load_template(T.Path(temp_file.name)))
+        template = transfer_script(template)
+
     option_dict["templating"] = template
 
     try:
-        option_dict["source"] = filesystems[data["source"]]
+        option_dict["source"] = FilesystemVertex(filesystems[data["source"]])
     except KeyError:
         raise InvalidConfigurationError(f"Transfer source named {data['source']} not found in filesystems list.")
 
     try:
-        option_dict["target"] = filesystems[data["target"]]
+        option_dict["target"] = FilesystemVertex(filesystems[data["target"]])
     except KeyError:
         raise InvalidConfigurationError(f"Transfer target named {data['target']} not defined in filesystems list.")
 
     try:
-        option_dict["cost"] = int(data["cost"])
+        option_dict["cost"] = PolynomialComplexity(data["cost"])
         if option_dict["cost"] < 0:
             raise InvalidConfigurationError(f"Cost of transfer {data['name']} can't be less than 0.")
     except KeyError:
@@ -189,6 +186,10 @@ def produce_route(data:T.Dict[str, T.Any], transfers:T.Dict[str, T.Any]) -> T.An
         except KeyError:
             # no transformations defined, just move on
             pass
+
+        if len(route) > 0:
+            if transfer.source != route[-1].target:
+                raise InvalidConfigurationError(f"Named route step named {step['name']} is not the target of its immediately preceding step!")
 
         route.append(transfer)
 
