@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from yaml import load, FullLoader
+from yaml import safe_load, FullLoader
 from tempfile import NamedTemporaryFile
 from common import types as T
 from common.models.graph import Route
@@ -206,7 +206,7 @@ def read_yaml(yaml_file:T.Path) -> T.Dict[str, T.Any]:
     object_dict: T.Dict[str, T.Any] = {}
 
     with open(yaml_file) as file:
-        data = load(file, FullLoader)
+        data = safe_load(file)
 
         filesystems = {}
         transfers = {}
