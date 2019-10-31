@@ -1,0 +1,11 @@
+---
+filesystems:
+- name: Lustre
+  driver: POSIXFilesystem
+  options:
+    max_concurrency: 50
+
+- name: iRODS
+  driver: iRODSFilesystem
+  options:
+    max_concurrency: 10
