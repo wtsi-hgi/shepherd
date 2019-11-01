@@ -30,11 +30,47 @@ class InvalidConfigurationError(BaseException):
     """Raised when an unrecognised value is found in the config file"""
     pass
 
+def validate_options(options:T.Dict[str, T.Any], type:str, name:str) -> T.Dict[str, T.Any]:
+    """Checks whether an option dictionary is suitable for
+    instantiating a particular class.
+    @param options Dictionary of the form {option_name: option_value}
+    @param type Name of a Register, currently either 'transformer' or 'filesystem'
+    @param object The name of a particular Register entry.
+    @return Dictionary with mapping {option: value}"""
+    option_dict:T.Dict[str, T.Any] = {}
+    valid_options:T.Dict[str, T.Type] = {}
+
+    if type == "transformer":
+        for argument in api.transformers[name].arguments:
+            valid_options[argument.name] = argument.type
+
+    elif type == "filesystem":
+        for argument in api.filesystems[name].arguments:
+            valid_options[argument.name] = argument.type
+
+    else:
+        raise InvalidConfigurationError(f"Can't validate options for {type}, type not recognised!")
+
+    for option in options:
+        value = options[option]
+
+        if option not in valid_options.keys():
+            raise InvalidConfigurationError(f"{type} of type '{name}' does not take option '{option}'!")
+
+        try:
+            option_dict[option] = valid_options[option](value)
+        except ValueError:
+            raise InvalidConfigurationError(f"File system option {option} is of type {type(value)}, which can't be cast to {valid_options[option]}.")
+
+    return option_dict
 
 def produce_filesystem(data:T.Dict[str, T.Any]) -> T.Any:
     """Takes a config dictionary describing a filesystem object, returns
     an object with those parameters."""
     driver:str = data["driver"]
+
+    if driver not in api.filesystems.keys():
+        raise InvalidConfigurationError(f"File system driver '{driver}' not recognised!")
 
     option_dict:T.Dict[str, T.Any] = {}
 
@@ -44,30 +80,9 @@ def produce_filesystem(data:T.Dict[str, T.Any]) -> T.Any:
         # object will use default value when initialised
         pass
 
-    if driver not in api.filesystems.keys():
-        raise InvalidConfigurationError(f"File system driver '{driver}' not recognised!")
-
-    valid_options:T.Dict[str, T.Type] = {}
-    # finds names and types of all defined options for file system driver
-    for argument in api.filesystems[driver].arguments:
-        opt_name = argument.name
-        opt_type = argument.type
-
-        valid_options[opt_name] = opt_type
-
-    for option in data["options"]:
-        # TODO: verify that each option is a simple key:value pair
-
-        value = data["options"][option]
-
-        if option not in valid_options.keys():
-            raise InvalidConfigurationError(f"File system option {option} not recognised!")
-
-        try:
-            # tries to cast the value to the option's expected type
-            option_dict[option] = valid_options[option](value)
-        except ValueError:
-            raise InvalidConfigurationError(f"File system option '{option}' is of type {type(value)}, which can't be cast to {valid_options[option]}.")
+    # for filesystems, the driver marks the Register index
+    option_dict.update(
+        validate_options(data["options"], "filesystem", driver))
 
     try:
         filesystem_object = api.filesystems[driver](**option_dict)
@@ -80,38 +95,18 @@ def produce_transformation(data:T.Dict[str, T.Any]):
     """Takes a config dictionary describing a transformation object, returns an
     object with those parameters."""
     name = data["name"]
-    opts = True
 
-    try:
-        options = data["options"]
-    except KeyError:
-        opts = False
+    if name not in api.transformers.keys():
+        raise InvalidConfigurationError(f"Transformation '{name}' not recognised!")
 
-    if not opts:
+    if "options" not in data.keys():
         return api.transformers[name].callable
 
-    valid_options:T.Dict[str, T.Type] = {}
-    # finds names and types of all defined options for the transformation
-    for argument in api.transformers[name].arguments:
-        opt_name = argument.name
-        opt_type = argument.type
-
-        valid_options[opt_name] = opt_type
-
     option_dict:T.Dict[str, T.Any] = {}
-    for option in options:
-        # TODO: verify each option is a simple key:value pair
 
-        value = options[option]
-
-        if option not in valid_options.keys():
-            raise InvalidConfigurationError(f"Transformation option {option} not recognised!")
-
-        try:
-            # tries to cast the value to the option's expected type
-            option_dict[option] = valid_options[option](value)
-        except ValueError:
-            raise InvalidConfigurationError(f"Transformation option '{option}' is of type {type(value)}, which can't be cast to {valid_options[option]}.")
+    # for transformations, the name marks the Register index
+    option_dict.update(
+        validate_options(data["options"], "transformer", name))
 
     try:
         transformation_object = api.transformers[name](**option_dict)
