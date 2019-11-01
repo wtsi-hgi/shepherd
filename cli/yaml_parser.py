@@ -35,7 +35,7 @@ def validate_options(options:T.Dict[str, T.Any], type:str, name:str) -> T.Dict[s
     instantiating a particular class.
     @param options Dictionary of the form {option_name: option_value}
     @param type Name of a Register, currently either 'transformer' or 'filesystem'
-    @param object The name of a particular Register entry.
+    @param name The name of a particular Register entry.
     @return Dictionary with mapping {option: value}"""
     option_dict:T.Dict[str, T.Any] = {}
     valid_options:T.Dict[str, T.Type] = {}
