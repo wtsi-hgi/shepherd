@@ -26,17 +26,20 @@ from lib import api
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 from lib.planning.templating import transfer_script, load_template
 
-class InvalidConfigurationError(BaseException):
+class InvalidConfigurationError(Exception):
     """Raised when an unrecognised value is found in the config file"""
     pass
 
 def validate_options(options:T.Dict[str, T.Any], type:str, name:str) -> T.Dict[str, T.Any]:
-    """Checks whether an option dictionary is suitable for
+    """
+    Checks whether an option dictionary is suitable for
     instantiating a particular class.
+
     @param options Dictionary of the form {option_name: option_value}
     @param type Name of a Register, currently either 'transformer' or 'filesystem'
     @param name The name of a particular Register entry.
-    @return Dictionary with mapping {option: value}"""
+    @return Dictionary with mapping {option: value}
+    """
     option_dict:T.Dict[str, T.Any] = {}
     valid_options:T.Dict[str, T.Type] = {}
 
@@ -160,7 +163,7 @@ def produce_transfer(data:T.Dict[str, T.Any], filesystems:T.Dict[str, T.Any]) ->
     return transfer_object
 
 def produce_route(data:T.Dict[str, T.Any], transfers:T.Dict[str, T.Any]) -> T.Any:
-    """Takes a config dictionary describing a route object, returns an object
+    """Takes a config dictionary describing a route object, returns an  object
     with those parameters."""
     name = data["name"]
 
