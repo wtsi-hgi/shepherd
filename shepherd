@@ -20,7 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 import sys
 
-from cli.main import main
+from cli import main
 
 
 if __name__ == "__main__":
