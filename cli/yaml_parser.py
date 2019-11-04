@@ -21,14 +21,12 @@ from yaml import safe_load, FullLoader
 
 from tempfile import NamedTemporaryFile
 from common import types as T
+from common.exceptions import InvalidConfigurationError
 from common.models.graph import Route
+from cli.resolve_template import resolve_template
 from lib import api
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 from lib.planning.templating import transfer_script, load_template
-
-class InvalidConfigurationError(Exception):
-    """Raised when an unrecognised value is found in the config file"""
-    pass
 
 def validate_options(options:T.Dict[str, T.Any], type:str, name:str) -> T.Dict[str, T.Any]:
     """
@@ -193,19 +191,23 @@ def produce_route(data:T.Dict[str, T.Any], transfers:T.Dict[str, T.Any]) -> T.An
 
     return route
 
-def read_yaml(yaml_file:T.Path) -> T.Dict[str, T.Any]:
+def read_yaml(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
     """
     Reads a YAML configuration file and validates each field. If the file is
     considered valid, an appropriate dictionary {field_name: Object} is
     returned.
 
     @param yaml_file Path object pointing at YAML config file
+    @param vars Dictionary of variable: value mappings
     @return dictionary of string: object mappings
     """
 
     object_dict: T.Dict[str, T.Any] = {}
 
-    with open(yaml_file) as file:
+    with NamedTemporaryFile() as file:
+
+        resolve_template(yaml_file, file.name, vars)
+
         data = safe_load(file)
 
         filesystems = {}
