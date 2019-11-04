@@ -17,30 +17,10 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-import os
-import re
-from functools import partial
-
 from common import types as T
-from common.templating import Jinja2Templating, Filter, templating_factory
+from common.templating import jinja2
 
 
-_sh_escape = re.compile(r"([\"$])")
-
-_filters:T.Dict[str, Filter] = {
-    "dirname":   os.path.dirname,
-    "basename":  os.path.basename,
-    "sh_escape": lambda x: _sh_escape.sub(r"\\\1", str(x))
-    # TODO Any other useful filters...
-}
-
-_jinja2 = partial(templating_factory, Jinja2Templating, filters=_filters)
-
-transfer_script = lambda script: _jinja2(templates={"script": script})
-wrapper_script = lambda wrapper: _jinja2(templates={"wrapper": wrapper}, variable_start_string="[[", variable_end_string="]]")
-
-
-def load_template(path:T.Path) -> str:
-    # Load template from file
-    with open(path, mode="rt") as f:
-        return f.read()
+# Convenience factories for transfer and wrapper scripts
+transfer_script = lambda script: jinja2.templating(templates={"script": script})
+wrapper_script = lambda wrapper: jinja2.templating(templates={"wrapper": wrapper}, variable_start_string="[[", variable_end_string="]]")

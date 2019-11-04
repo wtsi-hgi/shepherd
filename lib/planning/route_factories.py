@@ -19,7 +19,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from common import types as T
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
-from .templating import transfer_script, load_template
+from .templating import transfer_script
 from .types import FilesystemVertex, TransferRoute, PolynomialComplexity, On
 
 
@@ -27,7 +27,8 @@ from .types import FilesystemVertex, TransferRoute, PolynomialComplexity, On
 # will be defined in software or by configuration
 
 
-_script = transfer_script(load_template(T.Path("lib/planning/templates/posix_to_irods.sh.j2")))
+_posix_to_irods = T.Path("lib/planning/templates/posix_to_irods.sh.j2")
+_script = transfer_script(_posix_to_irods.read_text())
 
 def posix_to_irods_factory(posix:POSIXFilesystem, irods:iRODSFilesystem, *, cost:PolynomialComplexity = On) -> TransferRoute:
     """ Create POSIX to iRODS route """
