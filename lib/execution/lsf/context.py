@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import os
 
+import lib.execution.lsf.executor as executor
 from common import types as T
 from common.logging import log, failure
 from . import utils
-from .executor import LSF
 from .queue import LSFQueue
 from ..exceptions import *
 from ..types import WorkerIdentifier, BaseWorkerStatus, BaseWorkerContext
@@ -68,10 +68,10 @@ class LSFWorkerStatus(BaseWorkerStatus):
 
 class LSFWorkerContext(BaseWorkerContext):
     """ Worker context """
-    _lsf:LSF
+    _lsf:executor.LSF
     _id:WorkerIdentifier
 
-    def __init__(self, lsf:LSF, worker_id:T.Optional[WorkerIdentifier] = None) -> None:
+    def __init__(self, lsf:executor.LSF, worker_id:T.Optional[WorkerIdentifier] = None) -> None:
         self._lsf = lsf
 
         if worker_id is None:
