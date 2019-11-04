@@ -28,10 +28,10 @@ from ... import types as T
 from ...exceptions import NOT_IMPLEMENTED
 
 
-class UnsupportedByFilesystem(BaseException):
+class UnsupportedByFilesystem(Exception):
     """ Raised when an unsupported action is attempted on a filesystem """
 
-class DataInaccessible(BaseException):
+class DataInaccessible(Exception):
     """ Raised when data cannot be accessed for whatever reason """
 
 

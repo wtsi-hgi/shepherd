@@ -23,13 +23,13 @@ from __future__ import annotations
 
 import os
 
+import lib.execution.lsf.executor as executor
 from common import types as T
 from common.logging import log, failure
 from . import utils
-from .executor import LSF
 from .queue import LSFQueue
 from ..exceptions import *
-from ..types import WorkerIdentifier, BaseWorkerStatus, BaseWorkerContext
+from ..types import WorkerIdentifier, BaseWorkerStatus, BaseWorkerLimit, BaseWorkerContext
 
 
 class LSFWorkerStatus(BaseWorkerStatus):
@@ -66,12 +66,18 @@ class LSFWorkerStatus(BaseWorkerStatus):
         return self == LSFWorkerStatus.Succeeded
 
 
+class LSFWorkerLimit(BaseWorkerLimit):
+    # NOTE LSF limits are all properties of the queue, so the value of
+    # each item corresponds to the respective attribute of LSFQueue
+    Runtime = "runlimit"
+
+
 class LSFWorkerContext(BaseWorkerContext):
     """ Worker context """
-    _lsf:LSF
+    _lsf:executor.LSF
     _id:WorkerIdentifier
 
-    def __init__(self, lsf:LSF, worker_id:T.Optional[WorkerIdentifier] = None) -> None:
+    def __init__(self, lsf:executor.LSF, worker_id:T.Optional[WorkerIdentifier] = None) -> None:
         self._lsf = lsf
 
         if worker_id is None:
@@ -107,6 +113,9 @@ class LSFWorkerContext(BaseWorkerContext):
     def status(self) -> LSFWorkerStatus:
         status, _ = self._bjobs
         return status
+
+    def limit(self, limit:LSFWorkerLimit) -> T.Any:
+        return getattr(self.queue, limit.value)
 
     @property
     def queue(self) -> LSFQueue:

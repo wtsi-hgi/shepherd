@@ -1,0 +1,12 @@
+---
+named_routes:
+- name: archive
+  route:
+  - name: lustre_to_irods
+    transformations:
+    - name: strip_common_prefix
+    - name: prefix
+      options:
+        prefix: /humgen/{{ scratch_disk }}-archive/{{ project }}/
+    - name: telemetry
+    - name: debugging

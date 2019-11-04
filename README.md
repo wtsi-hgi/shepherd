@@ -1,5 +1,8 @@
 # shepherd
 
+**Work In Progress: This project is currently under active development
+and not in a released or usable state.**
+
 `shepherd` is a library and CLI tool for copying data between different
 filesystems -- either directly or via any number of intermediary stages,
 as necessary -- in parallel, over a distributed environment.

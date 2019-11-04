@@ -19,12 +19,10 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from abc import ABCMeta, abstractmethod
 
-from jinja2 import Environment, Template
-
-from . import types as T
+from .. import types as T
 
 
-class TemplatingError(BaseException):
+class TemplatingError(Exception):
     """ Raised on generic templating errors """
 
 
@@ -69,41 +67,6 @@ class BaseTemplating(metaclass=ABCMeta):
     @abstractmethod
     def render(self, name:str, **tags:T.Any) -> str:
         """ Render a specific template with the given tags """
-
-
-class Jinja2Templating(BaseTemplating):
-    """ Jinja2-based templating engine """
-    _env:Environment
-    _templates:T.Dict[str, T.Tuple[str, Template]]
-
-    def __init__(self, **kwargs:T.Any) -> None:
-        self._env = Environment(**kwargs)
-        self._templates = {}
-
-    @property
-    def templates(self) -> T.List[str]:
-        return list(self._templates.keys())
-
-    @property
-    def filters(self) -> T.List[str]:
-        return list(self._env.filters.keys())
-
-    def add_template(self, name:str, template:str) -> None:
-        self._templates[name] = template, self._env.from_string(template)
-
-    def get_template(self, name:str) -> str:
-        template, _ = self._templates[name]
-        return template
-
-    def add_filter(self, name:str, fn:Filter) -> None:
-        self._env.filters[name] = fn
-
-    def render(self, name:str, **tags:T.Any) -> str:
-        if name not in self._templates:
-            raise TemplatingError(f"No such template {name}")
-
-        _, template = self._templates[name]
-        return template.render(**tags)
 
 
 def templating_factory(cls:T.Type[BaseTemplating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None, **cls_kwargs:T.Any) -> BaseTemplating:
