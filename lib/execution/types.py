@@ -72,8 +72,19 @@ class BaseWorkerStatus(Enum):
         """ Has a finished worker succeeded? """
 
 
+class BaseWorkerLimit(Enum):
+    """ Abstract base worker limit enumeration """
+
+
 class BaseWorkerContext(metaclass=ABCMeta):
-    """ Base worker context model """
+    """
+    Base worker context model
+
+    Implementations required:
+    * id     :: () -> WorkerIdentifier
+    * status :: () -> BaseWorkerStatus
+    * limit  :: BaseWorkerLimit -> Any
+    """
     @property
     @abstractmethod
     def id(self) -> WorkerIdentifier:
@@ -83,6 +94,10 @@ class BaseWorkerContext(metaclass=ABCMeta):
     @abstractmethod
     def status(self) -> BaseWorkerStatus:
         """ Get the worker status """
+
+    @abstractmethod
+    def limit(self, limit:BaseWorkerLimit) -> T.Any:
+        """ Get the specified worker limit """
 
 
 @dataclass

@@ -29,7 +29,7 @@ from common.logging import log, failure
 from . import utils
 from .queue import LSFQueue
 from ..exceptions import *
-from ..types import WorkerIdentifier, BaseWorkerStatus, BaseWorkerContext
+from ..types import WorkerIdentifier, BaseWorkerStatus, BaseWorkerLimit, BaseWorkerContext
 
 
 class LSFWorkerStatus(BaseWorkerStatus):
@@ -64,6 +64,12 @@ class LSFWorkerStatus(BaseWorkerStatus):
     @property
     def is_successful(self) -> bool:
         return self == LSFWorkerStatus.Succeeded
+
+
+class LSFWorkerLimit(BaseWorkerLimit):
+    # NOTE LSF limits are all properties of the queue, so the value of
+    # each item corresponds to the respective attribute of LSFQueue
+    Runtime = "runlimit"
 
 
 class LSFWorkerContext(BaseWorkerContext):
@@ -107,6 +113,9 @@ class LSFWorkerContext(BaseWorkerContext):
     def status(self) -> LSFWorkerStatus:
         status, _ = self._bjobs
         return status
+
+    def limit(self, limit:LSFWorkerLimit) -> T.Any:
+        return getattr(self.queue, limit.value)
 
     @property
     def queue(self) -> LSFQueue:
