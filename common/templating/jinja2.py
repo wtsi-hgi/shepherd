@@ -21,7 +21,7 @@ import os
 import re
 from functools import partial
 
-from jinja2 import Environment, Template
+from jinja2 import Environment, Template, meta
 
 from .. import types as T
 from .types import BaseTemplating, Filter, TemplatingError, templating_factory
@@ -50,6 +50,10 @@ class Jinja2Templating(BaseTemplating):
     def get_template(self, name:str) -> str:
         template, _ = self._templates[name]
         return template
+
+    def get_variables(self, name:str) -> T.Set[str]:
+        source = self._env.parse(self.get_template(name))
+        return meta.find_undeclared_variables(source)
 
     def add_filter(self, name:str, fn:Filter) -> None:
         self._env.filters[name] = fn

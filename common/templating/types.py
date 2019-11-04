@@ -18,6 +18,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from abc import ABCMeta, abstractmethod
+from functools import reduce
 
 from .. import types as T
 
@@ -35,13 +36,15 @@ class BaseTemplating(metaclass=ABCMeta):
     Templating engine base class
 
     Implementations required:
-    * templates    :: () -> List[str]
-    * filters      :: () -> List[str]
-    * add_template :: str x str -> None
-    * get_template :: str -> str
-    * add_filter   :: str x Function -> None
-    * render       :: str x kwargs -> str
+    * templates     :: () -> List[str]
+    * filters       :: () -> List[str]
+    * add_template  :: str x str -> None
+    * get_template  :: str -> str
+    * get_variables :: str -> Set[str]
+    * add_filter    :: str x Function -> None
+    * render        :: str x kwargs -> str
     """
+    # TODO Use T.Iterator instead of T.List?
     @property
     @abstractmethod
     def templates(self) -> T.List[str]:
@@ -52,6 +55,14 @@ class BaseTemplating(metaclass=ABCMeta):
     def filters(self) -> T.List[str]:
         """ List of available filters """
 
+    @property
+    def variables(self) -> T.Set[str]:
+        """ Return all variables used by all templates """
+        return reduce(
+            set.union,
+            (self.get_variables(template) for template in self.templates),
+            set())
+
     @abstractmethod
     def add_template(self, name:str, template:str) -> None:
         """ Add a string template to the templating engine """
@@ -59,6 +70,10 @@ class BaseTemplating(metaclass=ABCMeta):
     @abstractmethod
     def get_template(self, name:str) -> str:
         """ Return the original template string """
+
+    @abstractmethod
+    def get_variables(self, name:str) -> T.Set[str]:
+        """ Get variables used by a template """
 
     @abstractmethod
     def add_filter(self, name:str, fn:Filter) -> None:
