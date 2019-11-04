@@ -34,10 +34,10 @@ from ..exceptions import NOT_IMPLEMENTED
 # but it doesn't affect functionality, only static analysis.
 
 
-class VertexNotInGraph(BaseException):
+class VertexNotInGraph(Exception):
     """ Raised when a vertex does not exist in the given graph """
 
-class NoRouteFound(BaseException):
+class NoRouteFound(Exception):
     """ Raised when no route can be found matching the itinerary """
 
 

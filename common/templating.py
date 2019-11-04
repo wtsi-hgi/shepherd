@@ -24,7 +24,7 @@ from jinja2 import Environment, Template
 from . import types as T
 
 
-class TemplatingError(BaseException):
+class TemplatingError(Exception):
     """ Raised on generic templating errors """
 
 

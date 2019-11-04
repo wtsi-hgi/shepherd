@@ -19,7 +19,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 # Exception Hierarchy:
 #
-# BaseException
+# Exception
 #  |
 #  +-- ExecutionException
 #       |
@@ -35,7 +35,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 #            |
 #            +-- NotAWorker
 
-class ExecutionException(BaseException):
+class ExecutionException(Exception):
     """ Base execution exception """
 
 class SubmissionException(ExecutionException):
