@@ -21,12 +21,15 @@ from yaml import safe_load, FullLoader
 
 from tempfile import NamedTemporaryFile
 from common import types as T
-from common.exceptions import InvalidConfigurationError
 from common.models.graph import Route
-from cli.resolve_template import resolve_template
+from cli.resolve_template import resolve_templates
 from lib import api
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 from lib.planning.templating import transfer_script, load_template
+
+class InvalidConfigurationError(Exception):
+    """Raised when an unrecognised value is found in a config file."""
+
 
 def validate_options(options:T.Dict[str, T.Any], type:str, name:str) -> T.Dict[str, T.Any]:
     """
@@ -204,37 +207,33 @@ def read_yaml(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
 
     object_dict: T.Dict[str, T.Any] = {}
 
-    with NamedTemporaryFile() as file:
+    data = resolve_templates(yaml_file, vars)
 
-        resolve_template(yaml_file, file.name, vars)
+    filesystems = {}
+    transfers = {}
+    routes = {}
 
-        data = safe_load(file)
+    for entry in data["filesystems"]:
+        name = entry["name"]
+        filesystems[name] = produce_filesystem(entry)
 
-        filesystems = {}
-        transfers = {}
-        routes = {}
+    if len(filesystems) == 0:
+        raise InvalidConfigurationError("No filesystems defined!")
 
-        for entry in data["filesystems"]:
-            name = entry["name"]
-            filesystems[name] = produce_filesystem(entry)
+    for entry in data["transfers"]:
+        name = entry["name"]
+        transfers[name] = produce_transfer(entry, filesystems)
 
-        if len(filesystems) == 0:
-            raise InvalidConfigurationError("No filesystems defined!")
+    if len(transfers) == 0:
+        raise InvalidConfigurationError("No transfers defined!")
 
-        for entry in data["transfers"]:
-            name = entry["name"]
-            transfers[name] = produce_transfer(entry, filesystems)
+    for entry in data["named_routes"]:
+        name = entry["name"]
+        routes[name] = produce_route(entry, transfers)
 
-        if len(transfers) == 0:
-            raise InvalidConfigurationError("No transfers defined!")
-
-        for entry in data["named_routes"]:
-            name = entry["name"]
-            routes[name] = produce_route(entry, transfers)
-
-        for key in data:
-            if key not in ("filesystems", "transfers", "named_routes"):
-                raise InvalidConfigurationError(f"Unrecognised category definition '{key}' in configuration file!")
+    for key in data:
+        if key not in ("filesystems", "transfers", "named_routes"):
+            raise InvalidConfigurationError(f"Unrecognised category definition '{key}' in configuration file!")
 
     object_dict["filesystems"] = filesystems
     object_dict["transfers"] = transfers

@@ -19,11 +19,54 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 import re
 from jinja2 import Template, Environment
+from yaml import safe_load
 
 from common import types as T
 from common.templating import templating_factory, Jinja2Templating
 from lib.planning.templating import _filters
 
+def resolve_templates(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, str]:
+    """Reads a YAML configuration file and resolves any template strings.
+    A structured dictionary of the parsed YAML is returned.
+
+    @param yaml_file Path object pointing at YAML config file
+    @param vars Dictionary of variable: value mappings
+    @return Dictionary representation of 'yaml_file'"""
+
+    template = templating_factory(Jinja2Templating, filters=_filters)
+
+    with open(yaml_file) as file:
+        data = safe_load(file)
+
+        for key in data:
+            if type(data[key]) in (list, dict):
+                _resolve(data[key], vars, template)
+            else:
+                if type(data[key]) is str:
+                    template.add_template("line", data[key])
+                    data[key] = template.render("line", **vars)
+
+        return data
+
+def _resolve(data:T.Any, vars:T.Dict[str,str], template:Jinja2Templating):
+    """Recursive function to be used by 'resolve_templates.'"""
+
+    if type(data) is list:
+        for index in range(len(data)):
+            if type(data[index]) in (list, dict):
+                _resolve(data[index], vars, template)
+            else:
+                if type(data[index]) is str:
+                    template.add_template("line", data[index])
+                    data[index] = template.render("line", **vars)
+    elif type(data) is dict:
+        for key in data:
+            if type(data[key]) in (list, dict):
+                _resolve(data[key], vars, template)
+            else:
+                if type(data[key]) is str:
+                    template.add_template("line", data[key])
+                    data[key] = template.render("line", **vars)
 
 def resolve_template(yaml_file:T.Path, temp_file:T.Path, vars:T.Dict[str, str]) -> None:
     # TODO: Replace this with something that doesn't use the filesystem

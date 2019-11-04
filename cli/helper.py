@@ -18,7 +18,9 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from common import types as T
-from common.exceptions import InvalidArgumentError
+
+class InvalidArgumentError(Exception):
+    """Raised when an argument input by the user is not recognised."""
 
 def general_help():
     """Prints general shepherd usage help text."""

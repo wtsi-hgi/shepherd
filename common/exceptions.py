@@ -17,10 +17,4 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-class InvalidConfigurationError(Exception):
-    """Raised when an unrecognised value is found in a config file."""
-
-class InvalidArgumentError(Exception):
-    """Raised when the user passes an unrecognised argument via the command line."""
-
 NOT_IMPLEMENTED = NotImplementedError("Oh dear...")
