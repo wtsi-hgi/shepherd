@@ -24,8 +24,8 @@ from common import types as T
 from common.models.graph import Route
 from cli.resolve_template import resolve_templates
 from lib import api
+from lib.planning.templating import transfer_script
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
-from lib.planning.templating import transfer_script, load_template
 
 class InvalidConfigurationError(Exception):
     """Raised when an unrecognised value is found in a config file."""

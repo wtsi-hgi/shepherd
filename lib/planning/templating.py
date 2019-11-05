@@ -18,27 +18,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from common import types as T
-<<<<<<< HEAD
-from common.templating import Jinja2Templating, Filter, templating_factory
-
-
-_sh_escape = re.compile(r"([\"$])")
-
-_filters:T.Dict[str, Filter] = {
-    "dirname":   os.path.dirname,
-    "basename":  os.path.basename,
-    "sh_escape": lambda x: _sh_escape.sub(r"\\\1", str(x)),
-    "to_lowercase": lambda x: x.lower()
-    # TODO Any other useful filters...
-}
-
-_jinja2 = partial(templating_factory, Jinja2Templating, filters=_filters)
-
-transfer_script = lambda script: _jinja2(templates={"script": script})
-wrapper_script = lambda wrapper: _jinja2(templates={"wrapper": wrapper}, variable_start_string="[[", variable_end_string="]]")
-=======
 from common.templating import jinja2
->>>>>>> develop
 
 
 # Convenience factories for transfer and wrapper scripts
