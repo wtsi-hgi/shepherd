@@ -41,7 +41,7 @@ def resolve_templates(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, st
             else:
                 if type(data[key]) is str:
                     template = jinja2.templating(templates={"line": data[key]})
-                    render = template.render("line", **vars)
+                    data[key] = template.render("line", **vars)
 
     return data
 
@@ -63,43 +63,8 @@ def _resolve(data:T.Any, vars:T.Dict[str,str]):
             else:
                 if type(data[key]) is str:
                     if key != "template" and data[key][0:2] != "#!":
+                        # hardcoded to omit field which may contain
+                        # template strings which are not meant to be
+                        # parsed yet
                         template = jinja2.templating(templates={"line": data[key]})
                         data[key] = template.render("line", **vars)
-
-def resolve_template(yaml_file:T.Path, temp_file:T.Path, vars:T.Dict[str, str]) -> None:
-    # TODO: Replace this with something that doesn't use the filesystem
-    """Reads a YAML configuration file with template strings and resolves
-    them based on variables passed by the user at runtime.
-    @param yaml_file Path object pointing at YAML config file
-    @param temp_file Path object pointing at a temporary file to write the resolved config to
-    @param vars Dictionary of variable:value mappings"""
-
-    env = Environment()
-    env.filters.update(_filters)
-
-    # stops processing variables when in a template: inline code block
-    ignore = re.compile("^[ ]*[-]*[ ]*template:")
-    # continues processing variables when another YAML declaration is seen
-    unignore = re.compile("^[ ]*[-]*[ ]*[a-zA-Z-_]+:")
-    template = re.compile("{{[\w\d.|\- ]*}}")
-
-    ignoring:T.Bool = False
-
-    with open(yaml_file, 'r') as src_file, open(temp_file, 'w') as temp_file:
-        for line in src_file:
-            if ignoring:
-                if unignore.search(line):
-                    ignoring = False
-            if not ignoring:
-                # ignore check needs to come second, because the unignore
-                # regex matches all declarations, while the ignore regex
-                # only matches a 'template:' declaration specifically.
-                if ignore.search(line):
-                    ignoring = True
-
-            if ignoring:
-                temp_file.write(line)
-            if not ignoring:
-                template = env.from_string(line)
-                rendered_line = template.render(**vars)
-                temp_file.write(rendered_line+"\n")
