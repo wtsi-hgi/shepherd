@@ -45,7 +45,7 @@ class _Template:
 
     def render(self, **variables) -> str:
         v = set(variables)
-        if v < self.variables or v.isdisjoint(self.variables):
+        if not self.variables <= v:
             missing = ", ".join(self.variables - v)
             raise TemplatingError(f"Variables undefined for template: {missing}")
 
