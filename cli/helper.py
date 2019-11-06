@@ -59,14 +59,31 @@ def route_help():
     # TODO: Add help text
     pass
 
+def action_help():
+    """Prints action help text."""
+    print("""
+Submit an action to shepherd. The action can either be a simple command, such
+as 'help', or a transfer query describing the transfer you want shepherd to
+carry out.
+
+Actions:
+    shepherd [OPTIONS] help [TOPIC]
+
+Queries:
+    shepherd [OPTIONS] through [ROUTE] using [FOFN PATH]
+    shepherd [OPTIONS] from [FILE SYSTEM] to [FILE SYSTEM] using [FOFN PATH]
+    """)
+
+
 available_topics:T.Dict[str, T.Callable] = {
     "templating": template_help,
     "filesystems": filesystem_help,
     "transformers": transformer_help,
-    "routes": route_help
+    "routes": route_help,
+    "actions": action_help
 }
 
-def help(topics:T.List[str], config:T.Dict[str, T.Any]) -> None:
+def help(topics:T.List[str]) -> None:
     """
     Main helper function. Takes a help topic and prints a relevant
     help string to standard output.
@@ -88,8 +105,5 @@ def help(topics:T.List[str], config:T.Dict[str, T.Any]) -> None:
             exit()
 
     for topic in topics:
-        try:
-            available_topics[topic](config)
-        except TypeError:
-            available_topics[topic]()
+        available_topics[topic]()
     exit()

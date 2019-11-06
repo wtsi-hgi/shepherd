@@ -17,11 +17,12 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawTextHelpFormatter
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from cli.helper import help
+from cli.start_transfer import start_transfer
 
 parser = ArgumentParser(description="TODO")
 parser.add_argument('--settings', '-S', nargs=1,
@@ -34,7 +35,8 @@ parser.add_argument('-v', nargs=1, action='append',
     help="VARIABLE=VALUE\nReplace instances of 'VARIABLE' in templated configuration files with 'VALUE'. Substitute multiple variables by using multiple '-v' flags.")
 parser.add_argument('--variables', nargs=1,
     help="Specify the path to a YAML file containing definitions for variables in templated configuration files.")
-parser.add_argument('action', nargs='+')
+parser.add_argument('action', nargs='+',
+    help="Action or query for shepherd. See 'shepherd help actions' for more.")
 
 def organise_vars(vars:T.List[str]) -> T.Dict[str, str]:
     """Converts list of strings 'VAR=VAL' to a dictionary with VAR:VAL
@@ -54,8 +56,11 @@ def main(*args:str) -> None:
     # shepherd executable
     args = parser.parse_args()
 
+    if args.action[0] == "help":
+        help(args.action)
+
     vars = organise_vars(args.v)
-    
+
     configuration = {
         "settings": T.Path(args.settings),
         "configuration": T.Path(args.configuration),
@@ -63,5 +68,4 @@ def main(*args:str) -> None:
         "variable_file": T.Path(args.variables)
     }
 
-    if args.action[0] == "help":
-        help(args.action, configuration)
+    start_transfer(args.action, configuration)
