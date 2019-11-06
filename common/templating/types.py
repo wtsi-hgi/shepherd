@@ -26,7 +26,8 @@ class TemplatingError(Exception):
     """ Raised on generic templating errors """
 
 
-# Filter type MUST have at least one string argument
+# Filter type MUST have at least one string argument,
+# which (AFAIK) can't be annotated
 Filter = T.Callable[..., str]
 
 
@@ -35,22 +36,18 @@ class BaseTemplating(metaclass=ABCMeta):
     Templating engine base class
 
     Implementations required:
-    * templates    :: () -> List[str]
-    * filters      :: () -> List[str]
-    * add_template :: str x str -> None
-    * get_template :: str -> str
-    * add_filter   :: str x Function -> None
-    * render       :: str x kwargs -> str
+    * templates     :: () -> Iterator[str]
+    * add_template  :: str x str -> None
+    * get_template  :: str -> str
+    * get_variables :: str -> Iterator[str]
+    * filters       :: () -> Iterator[str]
+    * add_filter    :: str x Function -> None
+    * render        :: str x kwargs -> str
     """
     @property
     @abstractmethod
-    def templates(self) -> T.List[str]:
-        """ List of available templates """
-
-    @property
-    @abstractmethod
-    def filters(self) -> T.List[str]:
-        """ List of available filters """
+    def templates(self) -> T.Iterator[str]:
+        """ Generator of available templates """
 
     @abstractmethod
     def add_template(self, name:str, template:str) -> None:
@@ -61,12 +58,27 @@ class BaseTemplating(metaclass=ABCMeta):
         """ Return the original template string """
 
     @abstractmethod
+    def get_variables(self, name:str) -> T.Iterator[str]:
+        """ Generator variables used by a template """
+
+    @property
+    def variables(self) -> T.Iterator[str]:
+        """ Generator of all variables used by all templates """
+        return iter({variable for template in self.templates
+                              for variable in self.get_variables(template)})
+
+    @property
+    @abstractmethod
+    def filters(self) -> T.Iterator[str]:
+        """ Generator of available filters """
+
+    @abstractmethod
     def add_filter(self, name:str, fn:Filter) -> None:
         """ Add a filter to the templating engine """
 
     @abstractmethod
-    def render(self, name:str, **tags:T.Any) -> str:
-        """ Render a specific template with the given tags """
+    def render(self, name:str, **variables:T.Any) -> str:
+        """ Render a specific template with the given variables """
 
 
 def templating_factory(cls:T.Type[BaseTemplating], *, filters:T.Optional[T.Dict[str, Filter]] = None, templates:T.Optional[T.Dict[str, str]] = None, **cls_kwargs:T.Any) -> BaseTemplating:
@@ -79,14 +91,17 @@ def templating_factory(cls:T.Type[BaseTemplating], *, filters:T.Optional[T.Dict[
     @param   cls_kwargs  Templating class initialisation parameters
     @return  Templating engine
     """
-    templating = cls(**(cls_kwargs or {}))
+    # Replace any sentinel values
+    filters    = filters    or {}
+    templates  = templates  or {}
+    cls_kwargs = cls_kwargs or {}
 
-    if filters is not None:
-        for name, fn in filters.items():
-            templating.add_filter(name, fn)
+    templating = cls(**cls_kwargs)
 
-    if templates is not None:
-        for name, template in templates.items():
-            templating.add_template(name, template)
+    for name, fn in filters.items():
+        templating.add_filter(name, fn)
+
+    for name, template in templates.items():
+        templating.add_template(name, template)
 
     return templating
