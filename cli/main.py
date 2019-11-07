@@ -26,10 +26,12 @@ from cli.start_transfer import start_transfer
 
 parser = ArgumentParser(description="TODO")
 parser.add_argument('--settings', '-S', nargs=1,
-    default=T.Path('~/.shepherdrc'),
+    # user input is stored in a list with a single element, a list default
+    # makes the argument simpler to process
+    default=['~/.shepherdrc'],
     help="Specify a custom path to the shepherd settings file.")
 parser.add_argument('--configuration', '-C', nargs=1,
-    default=T.Path('~/.shepherd'),
+    default=['~/.shepherd'],
     help="Specify a custom path to the shepherd configuration file, or directory containing multiple configuration files.")
 parser.add_argument('-v', nargs=1, action='append',
     help="VARIABLE=VALUE\nReplace instances of 'VARIABLE' in templated configuration files with 'VALUE'. Substitute multiple variables by using multiple '-v' flags.")
@@ -38,17 +40,34 @@ parser.add_argument('--variables', nargs=1,
 parser.add_argument('action', nargs='+',
     help="Action or query for shepherd. See 'shepherd help actions' for more.")
 
-def organise_vars(vars:T.List[str]) -> T.Dict[str, str]:
-    """Converts list of strings 'VAR=VAL' to a dictionary with VAR:VAL
-    mappings."""
-    variable_dict:T.Dict[str, str] = {}
+def prepare_config(args:T.Any) -> T.Dict[str, T.Any]:
+    """Converts argument parser namespace into an organised dictionary."""
+    if args.v is not None:
+        vars = {}
+        for variable in args.v:
+            variable_name, variable_value = variable[0].split("=")
+            vars[variable_name] = variable_value
+    else:
+        vars = None
 
-    for variable in vars:
-        # each string is contained in a one-element list
-        variable_name, variable_value = variable[0].split("=")
-        variable_dict[variable_name] = variable_value
+    settings = T.Path(args.settings[0]).expanduser()
 
-    return variable_dict
+    configuration = T.Path(args.configuration[0]).expanduser()
+
+    # TODO: scan the variable file here and just use it to set vars
+    if args.variables is not None:
+        variables = T.Path(args.variables[0]).expanduser()
+    else:
+        variables = None
+
+    config = {
+        "variables": vars,
+        "settings": settings,
+        "configuration": configuration,
+        "variable_file": variables
+    }
+
+    return config
 
 def main(*args:str) -> None:
     """ CLI entrypoint """
@@ -59,13 +78,6 @@ def main(*args:str) -> None:
     if args.action[0] == "help":
         help(args.action)
 
-    vars = organise_vars(args.v)
-
-    configuration = {
-        "settings": T.Path(args.settings),
-        "configuration": T.Path(args.configuration),
-        "given_variables": vars,
-        "variable_file": T.Path(args.variables)
-    }
+    configuration = prepare_config(args)
 
     start_transfer(args.action, configuration)

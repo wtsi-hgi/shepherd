@@ -19,6 +19,9 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from common import types as T
 
+from cli.yaml_parser import read_yaml
+from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
+
 class QueryError(Exception):
     """Raised when an unrecognised query is received from the user"""
 
@@ -34,7 +37,9 @@ def parse_action(action:T.List[str]) -> T.Dict[str, T.Any]:
         query["target"] = action[4]
         query["fofn"] = action[6]
     else:
-        raise QueryError(f"Query {' '.join(action)} not recognised.")
+        raise QueryError(f"Query '{' '.join(action)}' not recognised.")
+
+    return query
 
 def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     """
@@ -44,3 +49,22 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     @param action List of user input strings
     @param config Dictionary of various shepherd configuration values
     """
+    transfer_objects = read_yaml(config["configuration"], config["variables"])
+
+    query = parse_action(action)
+
+    if "route" in query.keys():
+        try:
+            route = transfer_objects["named_routes"][query["route"]]
+        except KeyError:
+            raise QueryError(f"Named route '{query['route']}' is not defined in the configuration file.")
+    elif "source" in query.keys() and "target" in query.keys():
+        try:
+            source = FilesystemVertex(
+                transfer_objects["filesystems"][query["source"]] )
+            target = FilesystemVertex(
+                transfer_objects["filesystems"][query["target"]] )
+            # TODO: What's the transfer route for these objects?
+            # What's the template, cost, etc
+        except KeyError:
+            raise QueryError(f"Either '{query['source']}' ")
