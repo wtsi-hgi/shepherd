@@ -49,7 +49,7 @@ By default, the configuration for `shepherd` is read from the
 directory. This location can be overridden with the following, common
 command line argument:
 
-    -C  --configuration  DIR|FILE  Path to shepherd configuration  [~/.shepherd]
+    -C  --configuration=DIR|FILE  Path to shepherd configuration  [~/.shepherd]
 
 The `shepherd` configuration can either be a directory, from which all
 YAML files will be read, or a specific YAML file. This argument can be
