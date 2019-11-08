@@ -35,6 +35,10 @@ def resolve_templates(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, st
     with open(yaml_file) as file:
         data = safe_load(file)
 
+        for var in data["defaults"]:
+            if var not in vars.keys():
+                vars[var] = data["defaults"][var]
+
         for key in data:
             if type(data[key]) in (list, dict):
                 _resolve(data[key], vars)

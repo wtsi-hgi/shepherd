@@ -89,3 +89,6 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
             raise QueryError(f"Either '{query['source']}' or '{query['target']}' is not defined in the configuration file.")
 
     working_dir = create_root(T.Path("."))
+
+def prepare_state_from_fofn():
+    pass

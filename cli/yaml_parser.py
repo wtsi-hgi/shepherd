@@ -232,7 +232,7 @@ def read_yaml(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
         routes[name] = produce_route(entry, transfers)
 
     for key in data:
-        if key not in ("filesystems", "transfers", "named_routes"):
+        if key not in ("filesystems", "transfers", "named_routes", "defaults"):
             raise InvalidConfigurationError(f"Unrecognised category definition '{key}' in configuration file!")
 
     object_dict["filesystems"] = filesystems

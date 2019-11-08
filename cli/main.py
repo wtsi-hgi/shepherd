@@ -28,22 +28,17 @@ from cli.start_transfer import start_transfer
 
 parser = ArgumentParser(description="TODO")
 
-parser.add_argument('--settings', '-S', nargs=1,
+parser.add_argument('--configuration', '-C', nargs=1,
     # user input is stored in a list with a single element, a list default
     # makes the argument simpler to process
-    default=['~/.shepherdrc'],
-    help="Specify a custom path to the shepherd settings file.")
-parser.add_argument('--configuration', '-C', nargs=1,
     default=['~/.shepherd'],
     help="Specify a custom path to the shepherd configuration file, or directory containing multiple configuration files.")
 parser.add_argument('-v', nargs=1, action='append',
     help="VARIABLE=VALUE\nReplace instances of 'VARIABLE' in templated configuration files with 'VALUE'. Substitute multiple variables by using multiple '-v' flags.")
-parser.add_argument('--variables', nargs=1,
-    help="Specify the path to a YAML file containing definitions for variables in templated configuration files.")
 parser.add_argument('action', nargs='*',
     help="Action or query for shepherd. See 'shepherd help actions' for more.")
 
-def declare_subparsers():
+def declare_prep_subparser():
     subparsers = parser.add_subparsers(help="For internal use only.")
 
     parser_prep = subparsers.add_parser("_prep")
@@ -54,36 +49,34 @@ def declare_subparsers():
     # label of target filesystem in config
     parser_prep.add_argument('--fstarget', nargs='?')
 
+def declare_work_subparser():
+    # TODO
+    pass
+
 def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
     """Converts argument parser namespace into an organised dictionary."""
     if parsed_args.v is not None:
-        vars = {}
+        variable_dict = {}
         for variable in parsed_args.v:
             variable_name, variable_value = variable[0].split("=")
-            vars[variable_name] = variable_value
+            variable_dict[variable_name] = variable_value
     else:
-        vars = None
-
-    settings = T.Path(parsed_args.settings[0]).expanduser()
+        variable_dict = None
 
     configuration = T.Path(parsed_args.configuration[0]).expanduser()
-
-    # TODO: scan the variable file here and just use it to set vars
-    if parsed_args.variables is not None:
-        variables = T.Path(parsed_args.variables[0]).expanduser()
-    else:
-        variables = None
 
     # original terminal input string
     command = " ".join(args)
 
     config = {
-        "variables": vars,
-        "settings": settings,
+        "variables": variable_dict,
         "configuration": configuration,
-        "variable_file": variables,
         "command": command
     }
+
+    # extra fields for prep and work modes
+    if "route" in vars(parsed_args):
+        config["route"] = parsed_args.route
 
     return config
 
@@ -91,11 +84,18 @@ def main(*args:str) -> None:
     """ CLI entrypoint """
     # seems to work even when main() is called from the top-level
     # shepherd executable
-    if "_prep" not in args and "_work" not in args:
+    mode = "user"
+    if "_prep" in args:
+        declare_prep_subparser()
         parsed_args = parser.parse_args()
+        mode = "prep"
+    elif "_work" in args:
+        declare_work_subparser()
+        parsed_args = parser.parse_args()
+        mode = "work"
     else:
-        declare_subparsers()
         parsed_args = parser.parse_args()
+
 
     if len(parsed_args.action) == 0:
         print("No action specified.")
@@ -105,9 +105,15 @@ def main(*args:str) -> None:
         help(parsed_args.action)
 
     print(parsed_args)
-    exit()
+    print("\n")
 
     configuration = prepare_config(parsed_args, args)
 
+    print(configuration)
+    print("\n")
 
-    start_transfer(parsed_args.action, configuration)
+
+    if mode == "user":
+        start_transfer(parsed_args.action, configuration)
+    elif mode == "prep":
+        prepare_state_from_fofn(parsed_args, configuration)
