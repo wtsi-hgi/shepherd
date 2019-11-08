@@ -1,2 +1,5 @@
 ---
-scratch_disk: scratch119
+defaults:
+  cluster: farm4
+  group: hgi-archive
+  scratch_disk: scratch119

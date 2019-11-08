@@ -79,6 +79,9 @@ taken from the following sources, in the given precedence:
 
        --variables=/path/to/variables.yml
 
+4. Variables defined under the `defaults` name in any configuration YAML
+   files.
+
 When the same variable is defined in multiple sources, then the most
 recent will be taken from the highest priority source, per the above.
 
