@@ -20,22 +20,34 @@ with this program. If not, see https://www.gnu.org/licenses/
 from common import types as T
 
 from cli.yaml_parser import read_yaml
+from common.logging import log, Level
+from common.models.graph import Graph, Edge
+from lib.state.native.db import NativeJob, create_root
+from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 
 class QueryError(Exception):
     """Raised when an unrecognised query is received from the user"""
 
+# TODO: implement these into the user configuration
+_CLUSTER = "farm4"
+
+#_EXEC = {
+#    _CLUSTER: LSF(T.Path(f"/usr/local/lsf/conf/lsbatch/{_CLUSTER}/configdir"), name=_CLUSTER)
+#}
+
 def parse_action(action:T.List[str]) -> T.Dict[str, T.Any]:
     """Parse action input and return dictionary of relevant values."""
+    # TODO: implement actual query language parser
     query:T.Dict[str, T.Any] = {}
 
     if action[0] == "through" and action[2] == "using":
         query["route"] = action[1]
         query["fofn"] = action[3]
-    elif action[1] == "from" and action[3] == "to" and action[5] == "using":
-        query["source"] = action[2]
-        query["target"] = action[4]
-        query["fofn"] = action[6]
+    elif action[0] == "from" and action[2] == "to" and action[4] == "using":
+        query["source"] = action[1]
+        query["target"] = action[3]
+        query["fofn"] = action[5]
     else:
         raise QueryError(f"Query '{' '.join(action)}' not recognised.")
 
@@ -53,18 +65,27 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
 
     query = parse_action(action)
 
+    route:T.TransferRoute = None
+
     if "route" in query.keys():
         try:
             route = transfer_objects["named_routes"][query["route"]]
         except KeyError:
             raise QueryError(f"Named route '{query['route']}' is not defined in the configuration file.")
+
     elif "source" in query.keys() and "target" in query.keys():
         try:
             source = FilesystemVertex(
                 transfer_objects["filesystems"][query["source"]] )
             target = FilesystemVertex(
                 transfer_objects["filesystems"][query["target"]] )
-            # TODO: What's the transfer route for these objects?
-            # What's the template, cost, etc
+
+            graph = Graph()
+            edge = Edge(source, target)
+            graph += edge
+            route = graph.route(source, target)
+
         except KeyError:
-            raise QueryError(f"Either '{query['source']}' ")
+            raise QueryError(f"Either '{query['source']}' or '{query['target']}' is not defined in the configuration file.")
+
+    working_dir = create_root(T.Path("."))
