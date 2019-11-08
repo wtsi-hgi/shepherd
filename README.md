@@ -40,7 +40,85 @@ Where `ROUTE` is a valid named route in the `shepherd` configuration.
 
 ### Targeting Query
 
-<!-- TODO -->
+The targeting query is used to identify files for the transfer. It is
+expressed in a simple DSL, described herein.
+
+#### Grammar
+
+**Note** Tokens are considered to be separated by at least one
+whitespace (`1*WSP`) in the following definitions. If tokens need to be
+juxtaposed (i.e., without whitespace), then they will be interposed in
+the grammar by an ampersand; if whitespace is optional (`*WSP`), tokens
+will be joined by a question mark:
+
+    TOKEN TOKEN    ; foo bar
+    TOKEN & TOKEN  ; foobar
+    TOKEN ? TOKEN  ; foobar / foo bar
+
+Otherwise, the grammar definition will be in ABNF, per [RFC
+5234](https://tools.ietf.org/html/rfc5234):
+
+```abnf
+QUERY       = "take" CLAUSE *(CONJUNCTION CLAUSE)
+
+CLAUSE      = SOURCE [CRITERIA]
+
+SOURCE      = FOFN / TREE
+
+FOFN        = "from" PATH
+            ; File of filenames
+
+TREE        = PATH
+            ; Directory tree
+
+PATH        = ; TODO
+            ; POSIX path (relative or absolute)
+
+CRITERIA    = "where" EXPRESSION
+
+EXPRESSION  = "(" ? EXPRESSION ? ")" / PREDICATE *(CONNECTIVE EXPRESSION)
+
+PREDICATE   = [NEGATION] KEYWORD COMPARATOR VALUE
+
+KEYWORD     = ; TODO
+
+COMPARATOR  = ; TODO
+
+VALUE       = ; TODO
+
+NEGATION    = "not"
+
+CONNECTIVE  = CONJUNCTION / DISJUNCTION
+
+CONJUNCTION = "and"
+
+DISJUNCTION = "or"
+```
+
+#### Context and Semantics
+
+<!-- TODO source filesystem, support (e.g., metadata), precedence -->
+
+#### Examples
+
+Files from a file of filenames:
+
+    take from /path/to/fofn
+
+All `.tar.gz` files under the current working directory, which either
+haven't been modified in the last 90 days or are larger than 1GB:
+
+    take . where (mtime >= 90d or size >= 1GB) and name = "*.tar.gz"
+
+Files from a file of filenames, with the given "reference" metadata
+value:
+
+    take from /path/to/fofn where metadata[reference] = GRCh38
+
+Specific files from a file of filenames and files from the parent
+directory:
+
+    take from /path/to/fofn where name = "foo*" and ..
 
 ### Configuration
 
