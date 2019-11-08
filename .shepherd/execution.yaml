@@ -1,0 +1,18 @@
+---
+executor:
+  driver: LSF
+  options:
+    config_dir: /usr/local/lsf/conf/lsbatch/{{ cluster }}/configdir
+
+phase:
+  preparation:
+    group: "{{ group }}"
+    queue: normal
+    cores: 1
+    memory: 1000
+
+  transfer:
+    group: "{{ group }}"
+    queue: long
+    cores: 4
+    memory: 1000
