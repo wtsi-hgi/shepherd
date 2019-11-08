@@ -52,10 +52,10 @@ command line argument:
     -C  --configuration=DIR|FILE  Path to shepherd configuration  [~/.shepherd]
 
 The `shepherd` configuration can either be a directory, from which all
-YAML files will be read, or a specific YAML file. This argument can be
-specified multiple times, where latter configuration will override any
-that has been previously consumed. (No precedence action is defined in
-the case of a tie.)
+YAML files (i.e., with extension `.yml` or `.yaml`) will be read, or a
+specific YAML file. This argument can be specified multiple times, where
+latter configuration will override any that has been previously
+consumed. (No precedence action is defined in the case of a tie.)
 
 **Note** It is important that all configuration files are available, at
 the same path, on all the nodes of your distributed environment that
