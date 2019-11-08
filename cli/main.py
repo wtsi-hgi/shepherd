@@ -78,6 +78,10 @@ def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
     if "route" in vars(parsed_args):
         config["route"] = parsed_args.route
 
+    if "fssource" in vars(parsed_args) and "fstarget" in vars(parsed_args):
+        config["filesystems"] = [parsed_args.fssource,
+            parsed_args.fstarget]
+
     return config
 
 def main(*args:str) -> None:
@@ -104,16 +108,9 @@ def main(*args:str) -> None:
     if parsed_args.action[0] == "help":
         help(parsed_args.action)
 
-    print(parsed_args)
-    print("\n")
-
     configuration = prepare_config(parsed_args, args)
-
     print(configuration)
-    print("\n")
-
-
     if mode == "user":
         start_transfer(parsed_args.action, configuration)
     elif mode == "prep":
-        prepare_state_from_fofn(parsed_args, configuration)
+        prepare_state_from_fofn(configuration)

@@ -17,13 +17,16 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from yaml import safe_load, FullLoader
+import os
+
+from yaml import safe_load
 
 from tempfile import NamedTemporaryFile
 from common import types as T
 from common.models.graph import Route
 from cli.resolve_template import resolve_templates
 from lib import api
+from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.planning.templating import transfer_script
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 
@@ -158,8 +161,12 @@ def produce_transfer(data:T.Dict[str, T.Any], filesystems:T.Dict[str, T.Any]) ->
 
     transfer_object = TransferRoute(**option_dict)
 
-    for transformation in data["transformations"]:
-        transfer_object += produce_transformation(transformation)
+    try:
+        for transformation in data["transformations"]:
+            transfer_object += produce_transformation(transformation)
+    except KeyError:
+        # no declared transformations
+        pass
 
     return transfer_object
 
@@ -194,24 +201,85 @@ def produce_route(data:T.Dict[str, T.Any], transfers:T.Dict[str, T.Any]) -> T.An
 
     return route
 
+def produce_executor(data:T.Dict[str, T.Any]) -> T.Dict[str, T.Any]:
+    """Takes a config dictionary describing an executor object, returns object
+    with those parameters."""
+
+    driver = data["driver"]
+
+    # TODO: make this more sophisticated when more executors become available
+    if driver.lower() == "lsf":
+        object = LSF(T.Path(data["options"]["config_dir"]), name="lsf")
+        return object
+
+def produce_phase(data:T.Dict[str, T.Any]) -> T.Dict[str, T.Any]:
+    """Takes a config dictionary describing an LSF options object, returns
+    object with those parameters."""
+    options = LSFSubmissionOptions(
+        cores = data["cores"],
+        memory = data["memory"],
+        group = data["group"],
+        queue = data["queue"]
+    )
+
+    return options
+
+
+def merge_yamls(yaml_path:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
+    """Reads in directory of YAML files and merges them into one dictionary.
+    Updates vars dictionary if 'variables.yaml' file is present."""
+
+    default_vars = {}
+    data = {}
+
+    for _, _, filenames in os.walk(yaml_path):
+        for file in filenames:
+            with open(yaml_path/file) as yaml_file:
+                _data = safe_load(yaml_file)
+
+                if "defaults" in _data.keys():
+                    default_vars.update(_data["defaults"])
+
+        for var in default_vars:
+            if var not in vars.keys():
+                vars[var] = default_vars[var]
+
+        for file in filenames:
+            # resolve_templates takes a path
+            _data = resolve_templates(yaml_path/file, vars)
+            data.update(_data)
+
+    return data
+
+
 def read_yaml(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
     """
     Reads a YAML configuration file and validates each field. If the file is
     considered valid, an appropriate dictionary {field_name: Object} is
     returned.
 
-    @param yaml_file Path object pointing at YAML config file
+    @param yaml_file Path object pointing at YAML config file or directory of files
     @param vars Dictionary of variable: value mappings
     @return dictionary of string: object mappings
     """
 
     object_dict: T.Dict[str, T.Any] = {}
 
-    data = resolve_templates(yaml_file, vars)
+    try:
+        data = resolve_templates(yaml_file, vars)
+    except IsADirectoryError:
+        data:T.Dict[str, T.Any] = {}
+        data = merge_yamls(yaml_file, vars)
 
     filesystems = {}
     transfers = {}
     routes = {}
+    executor = None
+    phases = {}
+
+    for key in data:
+        if key not in ("filesystems", "transfers", "named_routes", "defaults", "executor", "phase"):
+            raise InvalidConfigurationError(f"Unrecognised category definition '{key}' in configuration file!")
 
     for entry in data["filesystems"]:
         name = entry["name"]
@@ -231,11 +299,14 @@ def read_yaml(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
         name = entry["name"]
         routes[name] = produce_route(entry, transfers)
 
-    for key in data:
-        if key not in ("filesystems", "transfers", "named_routes", "defaults"):
-            raise InvalidConfigurationError(f"Unrecognised category definition '{key}' in configuration file!")
+    executor = produce_executor(data["executor"])
+
+    for entry in data["phase"]:
+        phases[entry] = produce_phase(data["phase"][entry])
 
     object_dict["filesystems"] = filesystems
     object_dict["transfers"] = transfers
     object_dict["named_routes"] = routes
+    object_dict["executor"] = executor
+    object_dict["phases"] = phases
     return object_dict
