@@ -24,17 +24,13 @@ from common.logging import log, Level
 from common.models.graph import Graph, Edge
 from lib.state.native.db import NativeJob, create_root
 from lib.execution.lsf import LSF, LSFSubmissionOptions
+from lib.execution.types import Job
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
 
 class QueryError(Exception):
     """Raised when an unrecognised query is received from the user"""
 
-# TODO: implement these into the user configuration
-_CLUSTER = "farm4"
-
-#_EXEC = {
-#    _CLUSTER: LSF(T.Path(f"/usr/local/lsf/conf/lsbatch/{_CLUSTER}/configdir"), name=_CLUSTER)
-#}
+# TODO: clean up the self-call parameters! Currently extremely messy
 
 def parse_action(action:T.List[str]) -> T.Dict[str, T.Any]:
     """Parse action input and return dictionary of relevant values."""
@@ -61,12 +57,12 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     @param action List of user input strings
     @param config Dictionary of various shepherd configuration values
     """
+    # this has to be here in full so the user can see config errors immediately
     transfer_objects = read_yaml(config["configuration"], config["variables"])
 
     query = parse_action(action)
 
-    route:T.TransferRoute = None
-
+    # this has to be here so the user can see query errors immediately
     if "route" in query.keys():
         try:
             route = transfer_objects["named_routes"][query["route"]]
@@ -79,16 +75,110 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
                 transfer_objects["filesystems"][query["source"]] )
             target = FilesystemVertex(
                 transfer_objects["filesystems"][query["target"]] )
-
-            graph = Graph()
-            edge = Edge(source, target)
-            graph += edge
-            route = graph.route(source, target)
-
         except KeyError:
             raise QueryError(f"Either '{query['source']}' or '{query['target']}' is not defined in the configuration file.")
 
     working_dir = create_root(T.Path("."))
 
-def prepare_state_from_fofn():
-    pass
+    # gets location of the binary from command line invocation
+    # TODO: don't just pass the whole command again, pass only what's needed
+    binary = T.Path( config["command"][0] ).resolve()
+    arguments = config["command"][1:]
+
+    # TODO: generalise this once more executors are added
+    lsf = transfer_objects["executor"]
+    lsf_options = transfer_objects["phases"]["preparation"]
+
+    quoted_args = " ".join(f'"{arg}"' for arg in arguments)
+
+    fofn = T.Path(query["fofn"]).resolve()
+
+    if "route" in query.keys():
+        prep = f"--route {query['route']}"
+    elif "source" in query.keys():
+        prep = f"--fssource {query['source']} --fstarget {query['target']}"
+
+    job = Job(f'"{binary}" {quoted_args} _prep {prep} --fofn {fofn} --stateroot {working_dir}')
+    job.stdout = worker.stderr = working_dir / "prep.log"
+
+    prep_job, *_ = lsf.submit(job, lsf_options)
+
+    log(f"Preparation job submitted with ID {prep_job.job}")
+    log(f"State and logs will reside in {working_dir}")
+
+def _print_status(status:JobStatus) -> None:
+    log(f"* Pending:    {status.pending}")
+    log(f"* Running:    {status.running}")
+    log(f"* Failed:     {status.failed}")
+    log(f"* Succeeded:  {status.succeeded}")
+
+def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
+    """
+    Reads file names in from a fofn file and starts a set of jobs that will
+    transfer those files from one filesystem to another. Should only be used
+    when shepherd is executed by 'start_transfer()'
+
+    @param config Dictionary of shepherd configuration values
+    """
+    transfer_objects = read_yaml(config["configuration"], config["variables"])
+
+    transfer:T.TransferRoute = None
+
+    if "route" in config.keys():
+        transfer = transfer_objects["named_routes"][config["route"]]
+    elif "filesystems" in config.keys():
+        fs = config["filesystems"]
+        source = FilesystemVertex(
+            transfer_objects["filesystems"][fs["source"]])
+        target = FilesystemVertex(
+            transfer_objects["filesystems"][fs["target"]])
+
+        graph = Graph()
+        edge = Edge(source, target)
+        graph += edge
+        transfer = graph.route(source, target)
+
+    job = NativeJob(config["stateroot"])
+    job.filesystem_mapping = transfer_objects["filesystems"]
+
+    # TODO: per-job concurrency depending on the filesystem being operated on
+    job.max_concurrency = min(fs.max_concurrency for fs in transfer_objects["filesystems"])
+
+    log(f"State:            {config['stateroot']}")
+    log(f"Job ID:           {job.job_id}")
+    log(f"Max Attempts:     {job.max_attempts}")
+    log(f"Max Concurrency:  {job.max_concurrency}")
+
+    tasks = 0
+    files = transfer_objects["filesystems"][config["source"]]._identify_by_fofn(
+        T.Path(config["fofn"]))
+
+    for task in transfer.plan(files):
+        log(("=" if tasks == 0 else "-") * 72)
+
+        job += task
+        tasks += 1
+
+        log(f"Source: {task.source.filesystem} {task.source.address}")
+        log(f"Target: {task.target.filesystem} {task.target.address}")
+
+    log("=" * 72)
+    log(f"Added {tasks} tasks to job:")
+    _print_status(job.status)
+
+    binary = T.Path( config["command"][0] ).resolve()
+    arguments = config["command"][1:]
+    arguments.remove("_prep")
+
+    quoted_args = " ".join(f'"{arg}"' for arg in arguments)
+
+    lsf = transfer_objects["executor"]
+    lsf_options = transfer_objects["phases"]["transfer"]
+
+    concurrent_job = Job(f"'{binary}' {quoted_args} _exec --jobid {job.job_id}")
+    concurrent_job.workers = job.max_concurrency
+    concurrent_job.stdout = concurrent_job.stderr = config["stateroot"] / "run.%I.log"
+
+    runners = list(lsf.submit(concurrent_job, lsf_options))
+
+    log(f"Execution job submitted with ID {runners[0].job} and {len(runners)} workers")

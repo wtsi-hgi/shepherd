@@ -24,7 +24,7 @@ from argparse import ArgumentParser
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from cli.helper import help
-from cli.start_transfer import start_transfer
+from cli.start_transfer import start_transfer, prepare_state_from_fofn
 
 parser = ArgumentParser(description="TODO")
 
@@ -48,8 +48,12 @@ def declare_prep_subparser():
     parser_prep.add_argument('--fssource', nargs='?')
     # label of target filesystem in config
     parser_prep.add_argument('--fstarget', nargs='?')
+    # path to fofn file
+    parser_prep.add_argument('--fofn', nargs=1)
+    # directory of state root
+    parser_prep.add_argument('--stateroot', nargs=1)
 
-def declare_work_subparser():
+def declare_exec_subparser():
     # TODO
     pass
 
@@ -63,24 +67,30 @@ def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
     else:
         variable_dict = None
 
-    configuration = T.Path(parsed_args.configuration[0]).expanduser()
-
-    # original terminal input string
-    command = " ".join(args)
+    configuration = T.Path(parsed_args.configuration[0]).resolve()
 
     config = {
         "variables": variable_dict,
         "configuration": configuration,
-        "command": command
+        # stores entire argument list
+        "command": args
     }
 
-    # extra fields for prep and work modes
-    if "route" in vars(parsed_args):
-        config["route"] = parsed_args.route
+    # extra fields for prep mode
+    # no error checks (for now?), assumed program passes valid input to itself
+    if "_prep" in args:
+        if parsed_args.route is not None:
+            config["route"] = parsed_args.route
 
-    if "fssource" in vars(parsed_args) and "fstarget" in vars(parsed_args):
-        config["filesystems"] = [parsed_args.fssource,
-            parsed_args.fstarget]
+        if parsed_args.fssource is not None and parsed_args.fstarget is not None:
+            config["filesystems"] = {
+                "source": parsed_args.fssource,
+                "target": parsed_args.fstarget
+            }
+
+        config["fofn"] = T.Path(parsed_args.fofn[0]).resolve()
+
+        config["stateroot"] = T.Path(parsed_args.stateroot[0]).resolve()
 
     return config
 
@@ -93,13 +103,12 @@ def main(*args:str) -> None:
         declare_prep_subparser()
         parsed_args = parser.parse_args()
         mode = "prep"
-    elif "_work" in args:
-        declare_work_subparser()
+    elif "_exec" in args:
+        declare_exec_subparser()
         parsed_args = parser.parse_args()
-        mode = "work"
+        mode = "exec"
     else:
         parsed_args = parser.parse_args()
-
 
     if len(parsed_args.action) == 0:
         print("No action specified.")
@@ -110,6 +119,7 @@ def main(*args:str) -> None:
 
     configuration = prepare_config(parsed_args, args)
     print(configuration)
+
     if mode == "user":
         start_transfer(parsed_args.action, configuration)
     elif mode == "prep":
