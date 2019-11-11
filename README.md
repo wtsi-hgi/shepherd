@@ -43,6 +43,29 @@ Where `ROUTE` is a valid named route in the `shepherd` configuration.
 The targeting query is used to identify files for the transfer. It is
 expressed in a simple DSL, described herein.
 
+#### Examples
+
+Files from a file of filenames:
+
+    take from /path/to/fofn
+
+All `.tar.gz` files under the current working directory and `/tmp`,
+which either haven't been modified in the last 90 days or are larger
+than 1GB:
+
+    take . /tmp where (mtime >= 90 days or size >= 1GB) and name = "*.tar.gz"
+
+Files from a file of filenames, with the given "reference" metadata
+value:
+
+    take from /path/to/fofn where :reference = GRCh38
+
+**Note** Special characters used by the shell ought to be quoted to
+avoid their automatic expansion.
+
+**Note** Some filesystems may not support certain forms of query and
+result in an error.
+
 #### Grammar
 
 **Note** Tokens are considered to be separated by at least one
@@ -59,13 +82,11 @@ Otherwise, the grammar definition will be in ABNF, per [RFC
 5234](https://tools.ietf.org/html/rfc5234):
 
 ```abnf
-QUERY       = "take" CLAUSE *(CONJUNCTION CLAUSE)
-
-CLAUSE      = SOURCE [CRITERIA]
+QUERY       = "take" SOURCE [CRITERIA]
 
 SOURCE      = FOFN / TREE
 
-FOFN        = "from" PATH
+FOFN        = "from" PATH ["compressed"] ["delimited" "by" OCTET]
             ; File of filenames
 
 TREE        = PATH
@@ -78,7 +99,7 @@ CRITERIA    = "where" EXPRESSION
 
 EXPRESSION  = "(" ? EXPRESSION ? ")" / PREDICATE *(CONNECTIVE EXPRESSION)
 
-PREDICATE   = [NEGATION] KEYWORD COMPARATOR VALUE
+PREDICATE   = [NEGATION] KEYWORD ? COMPARATOR ? VALUE
 
 KEYWORD     = ; TODO
 
@@ -88,37 +109,12 @@ VALUE       = ; TODO
 
 NEGATION    = "not"
 
-CONNECTIVE  = CONJUNCTION / DISJUNCTION
-
-CONJUNCTION = "and"
-
-DISJUNCTION = "or"
+CONNECTIVE  = "and" / "or"
 ```
 
 #### Context and Semantics
 
 <!-- TODO source filesystem, support (e.g., metadata), precedence -->
-
-#### Examples
-
-Files from a file of filenames:
-
-    take from /path/to/fofn
-
-All `.tar.gz` files under the current working directory, which either
-haven't been modified in the last 90 days or are larger than 1GB:
-
-    take . where (mtime >= 90d or size >= 1GB) and name = "*.tar.gz"
-
-Files from a file of filenames, with the given "reference" metadata
-value:
-
-    take from /path/to/fofn where metadata[reference] = GRCh38
-
-Specific files from a file of filenames and files from the parent
-directory:
-
-    take from /path/to/fofn where name = "foo*" and ..
 
 ### Configuration
 
