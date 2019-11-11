@@ -68,6 +68,77 @@ escaped, or be enquoted within single quotes at the shell-level.
 **Note** Some filesystems may not support certain forms of query and
 their use will result in error.
 
+#### Context and Semantics
+
+The source filesystem of the route, whether automatic or named, will set
+the context for the targeting query. That is, all paths, attributes and
+metadata queries will be executed with respect to this filesystem. To
+reiterate the above, *if the source filesystem does not support any part
+of your query, the process will fail and terminate in error*.
+
+Files can be sourced from one of two origins:
+
+* A file of filenames (FOFN), on the source filesystem, which is, by
+  default, uncompressed and `\n`-delimited.
+
+* A collection of search root directories, on the source filesystem.
+
+Attributes against each file can then be queried against, if relevant,
+to further filter the list of targeted files. These query criteria can
+further be logically combined arbitrarily.
+
+##### Attribute Criteria
+
+* `size` allows filtering based on file size. The value can be provided
+  as an integer without a unit, in which case it's interpreted as bytes,
+  or with a unit of kB, MB, GB, TB or PB (and their -ibi 1024-based
+  alternatives). For example:
+
+      size > 0 and size <= 1.2 GiB
+
+* `name` and `path` allow filtering based on the file's basename and
+  dirname, respectively. The value must be a string, which can contain
+  globbing patterns (`*` for any number of characters, `?` for exactly
+  one character, and character classes within `[]`) For example:
+
+      not path = "*/.git/*" and name = "file_[0-9]?.txt"
+
+  (Note that globbing characters can be escaped for them to be treated
+  as literals.)
+
+* `mtime`, `ctime` and `atime` allow filtering based on modification,
+  change and access time, respectively. The value can be specified as an
+  absolute date-time, without a unit, or a relative timespan (from now)
+  with a unit of hours, days, weeks or years. For example:
+
+      ctime > 1981-09-25 and mtime <= 2 hours
+
+  <!-- TODO Recognised date-time formats -->
+
+* `depth` allows filtering based on depth from the search root, which is
+  considered the zeroth level (n.b., this is not relevant to FOFN-based
+  targeting). For example:
+
+      depth = 1
+
+* `owner` and `group` allow filtering based on the file's ownership,
+  expressed as a username or UID, and group, expressed as a group name
+  or GID, respectively. For example:
+
+      owner = root and not group = 0
+
+##### Metadata Criteria
+
+Metadata associated with files is assumed to be in the form of key-value
+pairs. The key can be used as part of the search criteria by prefixing
+it with a colon and comparing it against a string value, potentially
+containing globbing patterns. For example:
+
+    not :sample_id = "[a-z]?????"
+
+(Note that globbing characters can be escaped for them to be treated as
+literals.)
+
 #### Grammar
 
 **Note** Tokens are considered to be separated by at least one
@@ -121,7 +192,7 @@ COMPARATOR  =  "=" / ">" / ">=" / "<" / "<="
 VALUE       =  STRING [UNIT]
 
 STRING      =  DQUOTE & &1*VCHAR & DQUOTE / &1*VCHAR
-            ;  FIXME This is not exact; expand to cover, e.g., escaping
+            ;  FIXME This is not precise; expand to cover, e.g., escaping
 
 UNIT        =  SIZE-UNIT / TIME-UNIT
 
@@ -134,11 +205,6 @@ NEGATION    =  "not"
 
 CONNECTIVE  =  "and" / "or"
 ```
-
-#### Context and Semantics
-
-<!-- TODO source filesystem, support (e.g., metadata), precedence,
-globbing -->
 
 ### Configuration
 
