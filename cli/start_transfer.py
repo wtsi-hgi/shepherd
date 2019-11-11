@@ -23,6 +23,7 @@ from cli.yaml_parser import read_yaml
 from common.logging import log, Level
 from common.models.graph import Graph, Edge
 from lib.state.native.db import NativeJob, create_root
+from lib.state.types import JobStatus, DataNotReady, WorkerRedundant
 from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.execution.types import Job
 from lib.planning.types import TransferRoute, PolynomialComplexity, FilesystemVertex
@@ -98,7 +99,14 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     elif "source" in query.keys():
         prep = f"--fssource {query['source']} --fstarget {query['target']}"
 
-    job = Job(f'"{binary}" {quoted_args} _prep {prep} --fofn {fofn} --stateroot {working_dir}')
+    v_indices = [i for i,val in enumerate(arguments) if val=="-v"]
+    variables = ""
+    for v in v_indices:
+        variables = variables + f"-v {arguments[v]}={arguments[v+1]}"
+
+    # the _prep keyword has to be put after the user arguments (variables,
+    # config) because it's the trigger word for the _prep subparser in cli/main
+    job = Job(f'"{binary}" {variable_arg} --configuration {config["configuration"]} _prep  {prep} --fofn {fofn} --stateroot {working_dir}')
     job.stdout = worker.stderr = working_dir / "prep.log"
 
     prep_job, *_ = lsf.submit(job, lsf_options)
@@ -142,7 +150,7 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     job.filesystem_mapping = transfer_objects["filesystems"]
 
     # TODO: per-job concurrency depending on the filesystem being operated on
-    job.max_concurrency = min(fs.max_concurrency for fs in transfer_objects["filesystems"])
+    job.max_concurrency = min(fs.max_concurrency for fs in transfer_objects["filesystems"].values())
 
     log(f"State:            {config['stateroot']}")
     log(f"Job ID:           {job.job_id}")
@@ -150,8 +158,7 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     log(f"Max Concurrency:  {job.max_concurrency}")
 
     tasks = 0
-    files = transfer_objects["filesystems"][config["source"]]._identify_by_fofn(
-        T.Path(config["fofn"]))
+    files = transfer_objects["filesystems"][config["source"]]._identify_by_fofn(T.Path(config["fofn"]))
 
     for task in transfer.plan(files):
         log(("=" if tasks == 0 else "-") * 72)
@@ -168,14 +175,17 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
 
     binary = T.Path( config["command"][0] ).resolve()
     arguments = config["command"][1:]
-    arguments.remove("_prep")
 
-    quoted_args = " ".join(f'"{arg}"' for arg in arguments)
+    v_indices = [i for i,val in enumerate(arguments) if val=="-v"]
+    variables = ""
+    for v in v_indices:
+        variables = variables + f"-v {arguments[v]}={arguments[v+1]}"
 
     lsf = transfer_objects["executor"]
     lsf_options = transfer_objects["phases"]["transfer"]
 
-    concurrent_job = Job(f"'{binary}' {quoted_args} _exec --jobid {job.job_id}")
+    concurrent_job = Job(f'"{binary}" {variables} --configuration {config["configuration"]} _exec --stateroot {config["stateroot"]} --job_id {job.job_id}')
+
     concurrent_job.workers = job.max_concurrency
     concurrent_job.stdout = concurrent_job.stderr = config["stateroot"] / "run.%I.log"
 

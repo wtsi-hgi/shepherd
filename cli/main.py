@@ -54,8 +54,12 @@ def declare_prep_subparser():
     parser_prep.add_argument('--stateroot', nargs=1)
 
 def declare_exec_subparser():
-    # TODO
-    pass
+    subparsers = parser.add_subparsers(help="For internal use only.")
+
+    parser_exec = subparsers.add_parser("_exec")
+    parser_exec.add_argument('--stateroot', nargs=1)
+    # job id passed by preparation job
+    parser_exec.add_argument('--job_id', nargs=1)
 
 def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
     """Converts argument parser namespace into an organised dictionary."""
@@ -91,6 +95,10 @@ def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
         config["fofn"] = T.Path(parsed_args.fofn[0]).resolve()
 
         config["stateroot"] = T.Path(parsed_args.stateroot[0]).resolve()
+    if "_exec" in args:
+        config["stateroot"] = T.Path(parsed_args.stateroot[0]).resolve()
+
+        config["job_id"] = parsed_args.job_id
 
     return config
 
@@ -110,16 +118,15 @@ def main(*args:str) -> None:
     else:
         parsed_args = parser.parse_args()
 
-    if len(parsed_args.action) == 0:
+    if len(parsed_args.action) == 0 and mode not in ["prep", "exec"]:
         print("No action specified.")
         exit(1)
 
-    if parsed_args.action[0] == "help":
+    if len(parsed_args.action) > 0 and parsed_args.action[0] == "help":
         help(parsed_args.action)
 
     configuration = prepare_config(parsed_args, args)
-    print(configuration)
-
+    
     if mode == "user":
         start_transfer(parsed_args.action, configuration)
     elif mode == "prep":
