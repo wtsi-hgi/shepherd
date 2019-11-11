@@ -86,47 +86,53 @@ Otherwise, the grammar definition will be in ABNF, per [RFC
 5234](https://tools.ietf.org/html/rfc5234):
 
 ```abnf
-QUERY       = "take" SOURCE [CRITERIA]
+QUERY       =  "take" SOURCE [CRITERIA]
 
-SOURCE      = FOFN / ROOTS
+SOURCE      =  FOFN / ROOTS
 
-FOFN        = "from" PATH ["compressed"] ["delimited" "by" OCTET]
-            ; File of filenames
+FOFN        =  "from" PATH ["compressed"] ["delimited" "by" OCTET]
+            ;  File of filenames
 
-ROOTS       = 1*PATH
-            ; Directory tree root(s)
+ROOTS       =  1*PATH
+            ;  Directory tree root(s)
 
-PATH        = ; TODO
-            ; POSIX path (relative or absolute)
+PATH        =  ; TODO
+            ;  POSIX path (relative or absolute)
 
-CRITERIA    = "where" EXPRESSION
+CRITERIA    =  "where" EXPRESSION
 
-EXPRESSION  = "(" ? EXPRESSION ? ")" / PREDICATE *(CONNECTIVE EXPRESSION)
+EXPRESSION  =  "(" ? EXPRESSION ? ")" / PREDICATE *(CONNECTIVE EXPRESSION)
 
-PREDICATE   = [NEGATION] KEYWORD ? COMPARATOR ? VALUE
+PREDICATE   =  [NEGATION] KEYWORD ? COMPARATOR ? VALUE
 
-KEYWORD     = ATTRIBUTE / METADATA
+KEYWORD     =  ATTRIBUTE / METADATA
 
-ATTRIBUTE   = ; TODO
+ATTRIBUTE   =  "size"
+ATTRIBUTE   =/ "name" / "path"
+ATTRIBUTE   =/ "mtime" / "ctime" / "atime"
+ATTRIBUTE   =/ "depth"
+ATTRIBUTE   =/ "owner" / "group"
+            ;  TODO Others?...
 
-METADATA    = ":" & ALPHA & &*(ALPHA / DIGIT / "_")
+METADATA    =  ":" & ALPHA & &*(ALPHA / DIGIT / "_")
 
-COMPARATOR  = "=" / ">" / ">=" / "<" / "<="
+COMPARATOR  =  "=" / ">" / ">=" / "<" / "<="
 
-VALUE       = STRING [UNIT]
+VALUE       =  STRING [UNIT]
 
-STRING      = DQUOTE ? &1*VCHAR ? DQUOTE / &1*VCHAR
+STRING      =  DQUOTE & &1*VCHAR & DQUOTE / &1*VCHAR
+            ;  FIXME This is not exact; expand to cover, e.g., escaping
 
-UNIT        = SIZE-UNIT / TIME-UNIT
+UNIT        =  SIZE-UNIT / TIME-UNIT
 
-SIZE-UNIT   = (%x6b / %x4d / %x47 / %x54 / %x50) & [%x69] & [%x42]
-            ; k/M/G/T/P & [i] & [B]
+SIZE-UNIT   =  (%x6b / %x4d / %x47 / %x54 / %x50) & [%x69] & [%x42]
+            ;  k/M/G/T/P & [i] & [B]
 
-TIME-UNIT   = ("hour" / "day" / "week" / "year") & ["s"]
+TIME-UNIT   =  ("hour" / "day" / "week" / "year") & ["s"]
 
-NEGATION    = "not"
+NEGATION    =  "not"
 
-CONNECTIVE  = "and" / "or"
+CONNECTIVE  =  "and" / "or"
 ```
 
 #### Context and Semantics
