@@ -45,20 +45,20 @@ expressed in a simple DSL, described herein.
 
 #### Examples
 
-Files from a file of filenames:
+* Files from a file of filenames:
 
-    take from /path/to/fofn
+      take from /path/to/fofn
 
-All `.tar.gz` files under the current working directory and `/tmp`,
-which either haven't been modified in the last 90 days or are larger
-than 1GB:
+* All `.tar.gz` files under the current working directory and `/tmp`,
+  which either haven't been modified in the last 90 days or are larger
+  than 1GB:
 
-    take . /tmp where (mtime >= 90 days or size >= 1GB) and name = "*.tar.gz"
+      take . /tmp where (mtime >= 90 days or size >= 1GB) and name = "*.tar.gz"
 
-Files from a file of filenames, with the given "reference" metadata
-value:
+* Files from a file of filenames, with the given "reference" metadata
+  value:
 
-    take from /path/to/fofn where :reference = GRCh38
+      take from /path/to/fofn where :reference = GRCh38
 
 **Note** Special characters used by the shell ought to be quoted to
 avoid their automatic expansion. If you need to quote any values in the
