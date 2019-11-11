@@ -61,10 +61,12 @@ value:
     take from /path/to/fofn where :reference = GRCh38
 
 **Note** Special characters used by the shell ought to be quoted to
-avoid their automatic expansion.
+avoid their automatic expansion. If you need to quote any values in the
+context of the query, then those (double) quotes either need to be
+escaped, or be enquoted within single quotes at the shell-level.
 
 **Note** Some filesystems may not support certain forms of query and
-result in an error.
+their use will result in error.
 
 #### Grammar
 
@@ -72,11 +74,13 @@ result in an error.
 whitespace (`1*WSP`) in the following definitions. If tokens need to be
 juxtaposed (i.e., without whitespace), then they will be interposed in
 the grammar by an ampersand; if whitespace is optional (`*WSP`), tokens
-will be joined by a question mark:
+will be joined by a question mark; these same sigils will be prefixed to
+repetition rules wherever it's ambiguious:
 
     TOKEN TOKEN    ; foo bar
     TOKEN & TOKEN  ; foobar
     TOKEN ? TOKEN  ; foobar / foo bar
+    TOKEN &1*TOKEN ; foofoofoofoo
 
 Otherwise, the grammar definition will be in ABNF, per [RFC
 5234](https://tools.ietf.org/html/rfc5234):
@@ -84,13 +88,13 @@ Otherwise, the grammar definition will be in ABNF, per [RFC
 ```abnf
 QUERY       = "take" SOURCE [CRITERIA]
 
-SOURCE      = FOFN / TREE
+SOURCE      = FOFN / ROOTS
 
 FOFN        = "from" PATH ["compressed"] ["delimited" "by" OCTET]
             ; File of filenames
 
-TREE        = PATH
-            ; Directory tree
+ROOTS       = 1*PATH
+            ; Directory tree root(s)
 
 PATH        = ; TODO
             ; POSIX path (relative or absolute)
@@ -101,11 +105,24 @@ EXPRESSION  = "(" ? EXPRESSION ? ")" / PREDICATE *(CONNECTIVE EXPRESSION)
 
 PREDICATE   = [NEGATION] KEYWORD ? COMPARATOR ? VALUE
 
-KEYWORD     = ; TODO
+KEYWORD     = ATTRIBUTE / METADATA
 
-COMPARATOR  = ; TODO
+ATTRIBUTE   = ; TODO
 
-VALUE       = ; TODO
+METADATA    = ":" & ALPHA & &*(ALPHA / DIGIT / "_")
+
+COMPARATOR  = "=" / ">" / ">=" / "<" / "<="
+
+VALUE       = STRING [UNIT]
+
+STRING      = DQUOTE ? &1*VCHAR ? DQUOTE / &1*VCHAR
+
+UNIT        = SIZE-UNIT / TIME-UNIT
+
+SIZE-UNIT   = (%x6b / %x4d / %x47 / %x54 / %x50) & [%x69] & [%x42]
+            ; k/M/G/T/P & [i] & [B]
+
+TIME-UNIT   = ("hour" / "day" / "week" / "year") & ["s"]
 
 NEGATION    = "not"
 
@@ -114,7 +131,8 @@ CONNECTIVE  = "and" / "or"
 
 #### Context and Semantics
 
-<!-- TODO source filesystem, support (e.g., metadata), precedence -->
+<!-- TODO source filesystem, support (e.g., metadata), precedence,
+globbing -->
 
 ### Configuration
 
