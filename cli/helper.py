@@ -74,13 +74,37 @@ Queries:
     shepherd [OPTIONS] from [FILE SYSTEM] to [FILE SYSTEM] using [FOFN PATH]
     """)
 
+def executor_help():
+    """Prints executor help text."""
+    # TODO
+    pass
+
+def phase_help():
+    # TODO: better description of phases
+    print("""
+Phases describe the parameters passed to the execution engine at different
+stages of shepherd's execution. They are defined in the configuration file.
+
+phase:
+  (phase_name):
+    group:
+    cores:
+    memory:
+    queue:
+
+There are two mandatory phase definitions:
+- preparation: Job which prepares the transfer jobs, collating files and instantiating the state engine
+- transfer: Jobs which transfer files from one filesystem to another
+    """)
 
 available_topics:T.Dict[str, T.Callable] = {
     "templating": template_help,
     "filesystems": filesystem_help,
     "transformers": transformer_help,
     "routes": route_help,
-    "actions": action_help
+    "actions": action_help,
+    "executors": executor_help,
+    "phases": phase_help
 }
 
 def help(topics:T.List[str]) -> None:

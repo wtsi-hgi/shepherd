@@ -212,15 +212,10 @@ def produce_executor(data:T.Dict[str, T.Any]) -> T.Dict[str, T.Any]:
         object = LSF(T.Path(data["options"]["config_dir"]), name="lsf")
         return object
 
-def produce_phase(data:T.Dict[str, T.Any]) -> T.Dict[str, T.Any]:
+def produce_phase(data:T.Dict[str, T.Any]) -> T.Any:
     """Takes a config dictionary describing an LSF options object, returns
     object with those parameters."""
-    options = LSFSubmissionOptions(
-        cores = data["cores"],
-        memory = data["memory"],
-        group = data["group"],
-        queue = data["queue"]
-    )
+    options = LSFSubmissionOptions(**data)
 
     return options
 
@@ -303,6 +298,8 @@ def read_yaml(yaml_file:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
 
     for entry in data["phase"]:
         phases[entry] = produce_phase(data["phase"][entry])
+    if not ("preparation" in phases.keys() and "transfer" in phases.keys()):
+        raise InvalidConfigurationError("A mandatory phase definition has not been defined in the configuraton file. See 'shepherd help phases' for more information.")
 
     object_dict["filesystems"] = filesystems
     object_dict["transfers"] = transfers
