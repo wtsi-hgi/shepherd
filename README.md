@@ -165,10 +165,19 @@ FOFN        =  "from" PATH ["compressed"] ["delimited" "by" OCTET]
             ;  File of filenames
 
 ROOTS       =  1*PATH
-            ;  Directory tree root(s)
+            ;  Directory tree search root(s)
 
-PATH        =  ; TODO
-            ;  POSIX path (relative or absolute)
+PATH        =  PATH-SEP / PATH-SEP & PATH-REL / PATH-REL
+            ;  POSIX-style path (root, absolute or relative)
+
+PATH-REL    =  PATH-PART & &*(PATH-SEP PATH-PART) & [PATH-SEP]
+
+PATH-SEP    =  %x2f
+            ;  /
+
+PATH-PART   =  &1*(%x01-2e / %x30-7f)
+            ;  7-bit US-ASCII, excluding NUL and /
+            ;  FIXME? This is probably insufficient...
 
 CRITERIA    =  "where" EXPRESSION
 
