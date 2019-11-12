@@ -226,6 +226,8 @@ def merge_yamls(yaml_path:T.Path, vars:T.Dict[str, str]) -> T.Dict[str, T.Any]:
 
     default_vars = {}
     data = {}
+    if vars == None:
+        vars = {}
 
     for _, _, filenames in os.walk(yaml_path):
         for file in filenames:
