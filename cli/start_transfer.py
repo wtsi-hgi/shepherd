@@ -99,7 +99,7 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     v_indices = [i for i,val in enumerate(arguments) if val=="-v"]
     variables = ""
     for v in v_indices:
-        variables += f"-v {arguments[v]}={arguments[v+1]}"
+        variables += f"-v {arguments[v+1]}"
 
     # the _prep keyword has to be put after the user arguments (variables,
     # config) because it's the trigger word for the _prep subparser in cli/main
@@ -176,7 +176,7 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     v_indices = [i for i,val in enumerate(arguments) if val=="-v"]
     variables = ""
     for v in v_indices:
-        variables += f"-v {arguments[v]}={arguments[v+1]}"
+        variables += f"-v {arguments[v+1]}"
 
     lsf = transfer_objects["executor"]
     lsf_options = transfer_objects["phases"]["transfer"]
