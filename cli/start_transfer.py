@@ -130,7 +130,9 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     transfer:T.TransferRoute = None
 
     if "route" in config.keys():
-        transfer = transfer_objects["named_routes"][config["route"]]
+        # TODO: this takes the FIRST transfer in a route. Implement route
+        # resolution
+        transfer = transfer_objects["named_routes"][config["route"]][0]
     elif "filesystems" in config.keys():
         fs = config["filesystems"]
         source = FilesystemVertex(
@@ -161,7 +163,7 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     elif "route" in config.keys():
         # TODO: this takes the FIRST transfer in the route, which makes
         # multi-stage routes not work
-        _filesystem = transfer_objects["named_routes"][config["route"]][0].source()
+        _filesystem = transfer_objects["named_routes"][config["route"]][0].source
         files = _filesystem._identify_by_fofn(T.Path(config["fofn"]))
 
     for task in transfer.plan(files):
