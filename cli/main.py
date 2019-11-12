@@ -96,7 +96,7 @@ def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
     if "_exec" in args:
         config["stateroot"] = T.Path(parsed_args.stateroot[0]).resolve()
 
-        config["job_id"] = parsed_args.job_id
+        config["job_id"] = parsed_args.job_id[0]
 
     return config
 
