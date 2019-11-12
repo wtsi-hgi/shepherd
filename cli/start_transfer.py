@@ -155,7 +155,12 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     log(f"Max Concurrency:  {job.max_concurrency}")
 
     tasks = 0
-    files = transfer_objects["filesystems"][config["source"]]._identify_by_fofn(T.Path(config["fofn"]))
+    if "source" in config.keys():
+        files = transfer_objects["filesystems"][config["source"]]._identify_by_fofn(T.Path(config["fofn"]))
+
+    elif "route" in config.keys():
+        _filesystem = transfer_objects["named_routes"][config["route"]].source()
+        files = _filesystem._identify_by_fofn(T.Path(config["fofn"]))
 
     for task in transfer.plan(files):
         log(("=" if tasks == 0 else "-") * 72)
