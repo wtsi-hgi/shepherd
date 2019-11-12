@@ -87,10 +87,8 @@ def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
             config["route"] = parsed_args.route
 
         if parsed_args.fssource is not None and parsed_args.fstarget is not None:
-            config["filesystems"] = {
-                "source": parsed_args.fssource,
-                "target": parsed_args.fstarget
-            }
+            config["source"] = parsed_args.fssource
+            config["target"] = parsed_args.fstarget
 
         config["fofn"] = T.Path(parsed_args.fofn[0]).resolve()
 
