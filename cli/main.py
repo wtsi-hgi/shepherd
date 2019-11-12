@@ -118,7 +118,7 @@ def main(*args:str) -> None:
     else:
         parsed_args = parser.parse_args()
 
-    if len(parsed_args.action) == 0 and mode not in ["prep", "exec"]:
+    if len(parsed_args.action) == 0 and mode == "user":
         print("No action specified.")
         exit(1)
 
@@ -126,7 +126,7 @@ def main(*args:str) -> None:
         help(parsed_args.action)
 
     configuration = prepare_config(parsed_args, args)
-    
+
     if mode == "user":
         start_transfer(parsed_args.action, configuration)
     elif mode == "prep":
