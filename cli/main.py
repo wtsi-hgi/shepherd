@@ -24,7 +24,7 @@ from argparse import ArgumentParser
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from cli.helper import help
-from cli.start_transfer import start_transfer, prepare_state_from_fofn
+from cli.start_transfer import start_transfer, prepare_state_from_fofn, run_state
 
 parser = ArgumentParser(description="TODO")
 
@@ -59,7 +59,7 @@ def declare_exec_subparser():
     parser_exec = subparsers.add_parser("_exec")
     parser_exec.add_argument('--stateroot', nargs=1)
     # job id passed by preparation job
-    parser_exec.add_argument('--job_id', nargs=1)
+    parser_exec.add_argument('--job_id', nargs=1, type=int)
 
 def prepare_config(parsed_args:T.Any, args:T.List[str]) -> T.Dict[str, T.Any]:
     """Converts argument parser namespace into an organised dictionary."""
@@ -131,3 +131,5 @@ def main(*args:str) -> None:
         start_transfer(parsed_args.action, configuration)
     elif mode == "prep":
         prepare_state_from_fofn(configuration)
+    elif mode == "exec":
+        run_state(configuration)

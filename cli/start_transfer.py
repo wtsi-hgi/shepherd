@@ -89,8 +89,6 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     lsf = transfer_objects["executor"]
     lsf_options = transfer_objects["phases"]["preparation"]
 
-    quoted_args = " ".join(f'"{arg}"' for arg in arguments)
-
     fofn = T.Path(query["fofn"]).resolve()
 
     if "route" in query.keys():
@@ -101,7 +99,7 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     v_indices = [i for i,val in enumerate(arguments) if val=="-v"]
     variables = ""
     for v in v_indices:
-        variables = variables + f"-v {arguments[v]}={arguments[v+1]}"
+        variables += f"-v {arguments[v]}={arguments[v+1]}"
 
     # the _prep keyword has to be put after the user arguments (variables,
     # config) because it's the trigger word for the _prep subparser in cli/main
@@ -178,7 +176,7 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     v_indices = [i for i,val in enumerate(arguments) if val=="-v"]
     variables = ""
     for v in v_indices:
-        variables = variables + f"-v {arguments[v]}={arguments[v+1]}"
+        variables += f"-v {arguments[v]}={arguments[v+1]}"
 
     lsf = transfer_objects["executor"]
     lsf_options = transfer_objects["phases"]["transfer"]
@@ -191,3 +189,53 @@ def prepare_state_from_fofn(config:T.Dict[str, T.Any]) -> None:
     runners = list(lsf.submit(concurrent_job, lsf_options))
 
     log(f"Execution job submitted with ID {runners[0].job} and {len(runners)} workers")
+
+def run_state(config:T.Dict[str, T.Any]) -> None:
+    """Iterates through the tasks in the state database and executes them."""
+
+    transfer_objects = read_yaml(config["configuration"], config["variables"])
+
+    job = NativeJob(config["stateroot"], job_id=config["job_id"], force_restart=True)
+
+    job.filesystem_mapping = transfer_objects["filesystems"]
+
+    log(f"State:        {config['stateroot']}")
+    log(f"Job ID:       {job.job_id}")
+    log(f"Max Attempts: {job.max_attempts}")
+
+    lsf = transfer_objects["executor"]
+
+    job.worker_index = worker_index = lsf.worker.id.worker
+    log(f"Worker        {worker_index} of {job.max_concurrency}")
+
+    try:
+        _print_status(job.status)
+    except WorkerRedundant:
+        log("Worker has nothing to do, terminating.")
+        exit(0)
+
+    tasks = 0
+    while job.status:
+        try:
+            task = next(job)
+
+        except StopIteration:
+            break
+
+        except DataNotReady:
+            log("Not ready, waiting 60 seconds...")
+            sleep(60)
+            continue
+
+        log(("=" if tasks == 0 else "-") * 72)
+        log(f"Source: {task.source.filesystem} {task.source.address}")
+        log(f"Target: {task.target.filesystem} {task.target.address}")
+
+        # TODO: check exit status and update state?
+        task()
+
+        tasks += 1
+
+    log("=" * 72)
+    log("Done.")
+    _print_status(job.status)
