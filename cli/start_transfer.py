@@ -104,7 +104,7 @@ def start_transfer(action:T.List[str], config:T.Dict[str, T.Any]) -> None:
     # the _prep keyword has to be put after the user arguments (variables,
     # config) because it's the trigger word for the _prep subparser in cli/main
     job = Job(f'"{binary}" {variables} --configuration {config["configuration"]} _prep  {prep} --fofn {fofn} --stateroot {working_dir}')
-    job.stdout = worker.stderr = working_dir / "prep.log"
+    job.stdout = job.stderr = working_dir / "prep.log"
 
     prep_job, *_ = lsf.submit(job, lsf_options)
 
