@@ -7,6 +7,6 @@ named_routes:
     - name: strip_common_prefix
     - name: prefix
       options:
-        prefix: /humgen/{{ scratch_disk }}-archive/{{ project }}/
+        prefix: /humgen/{{ scratch_disk }}-backup/{{ project }}/
     - name: telemetry
     - name: debugging
