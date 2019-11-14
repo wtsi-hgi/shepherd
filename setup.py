@@ -17,34 +17,41 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+from pathlib import Path
 from setuptools import setup
 
+
+# FIXME The dummy CLI instantiates objects that depend on the external
+# libraries defined herein, so we can't import it here without creating
+# an unresolvable loop. The "proper" CLI must address this.
 from lib import __version__ as lib_version
 from cli import __version__ as cli_version
 
 version = f"{cli_version}/{lib_version}"
 
-with open("README.md", "rt") as f:
-    long_description = f.read()
 
 setup(
     name="shepherd",
     version=version,
 
-    description="Data shepherd",
-    long_description=long_description,
+    description="Filesystem-agnostic distributed copy tool",
+    long_description=Path("README.md").read_text(),
 
     author="Christopher Harrison",
     license="GPLv3",
-
-    classifiers=[
-        # TODO Insert more here...
-        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Programming Language :: Python :: 3.7"],
 
     packages=["shepherd"],
     python_requires=">=3.7",
     install_requires=[
         # TODO Insert more here...
-        "Jinja2"]
+        "Jinja2",
+        "PyYAML",
+        "pyscopg2"
+    ],
+
+    classifiers=[
+        # TODO Insert more here...
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "Programming Language :: Python :: 3.7"
+    ]
 )
