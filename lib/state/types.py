@@ -29,16 +29,6 @@ from common.models.task import Task
 from common.models.filesystems.types import BaseFilesystem
 
 
-class DataNotReady(Exception):
-    """ Raised when data is not yet available """
-
-class WorkerRedundant(Exception):
-    """ Raised when a worker has nothing to do """
-
-class NoCommonChecksumAlgorithm(Exception):
-    """ Raised when filesystems do not share a common checksumming algorithm """
-
-
 @dataclass
 class JobStatus:
     """ Model for expressing job task status and properties """
@@ -64,7 +54,6 @@ class JobStatus:
 
 # TODO Adaptors for Data and Task that augment them with machinery to
 # track and update persisted state (maybe an ABC mixin?)
-
 
 
 class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
