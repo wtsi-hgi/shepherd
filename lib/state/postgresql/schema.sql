@@ -310,60 +310,50 @@ create view if not exists job_throughput as
            target_fs.name;
 
 
-commit;
-
-
-
-
--- Overall job status, partitioned by worker
-create view if not exists job_status as
+-- Job status: A view of counts of task states per job.
+create view if not exists job_staus as
   select   tasks.job,
-           tasks.id % job_parameters.max_concurrency as worker_id,
 
-           -- Pending: Non-zero exit code and fewer attempts than maximum
-           sum(case when
-             task_status.attempt < job_parameters.max_attempts
-               and task_status.exit_code is not null
-               and task_status.exit_code != 0
-             then 1
+           -- Pending: Failed tasks with fewer attempts than maximum
+           sum(case
+             when task_status.attempt < jobs.max_attempts
+               and not task_status.succeeded
+               then 1
              else 0
            end) as pending,
 
-           -- Running: Null exit code
-           sum(case when
-             task_status.exit_code is null
-             then 1
+           -- Running: Null success (i.e., no exit code)
+           sum(case
+             when task_status.succeeded is null then 1
              else 0
            end) as running,
 
-           -- Failed: Non-zero exit code at maximum attempts
-           sum(case when
-             task_status.attempt = job_parameters.max_attempts
-               and task_status.exit_code is not null
-               and task_status.exit_code != 0
-             then 1
+           -- Failed: Non-zero exit code after maximum attempts
+           -- (i.e., terminal failure)
+           sum(case
+             when task_status.attempt = jobs.max_attempts
+               and not task_status.succeeded
+               then 1
              else 0
            end) as failed,
 
            -- Succeeded: Zero exit code
-           sum(case when
-             task_status.exit_code = 0
-             then 1
+           sum(case
+             when task_status.succeeded then 1
              else 0
-           end) as succeeded,
-
-           max(jobs.start)  as start,
-           max(jobs.finish) as finish
+           end) as succeeded
 
   from     task_status
   join     tasks
   on       tasks.id = task_status.task
   join     jobs
   on       jobs.id = tasks.job
-  join     job_parameters
-  on       job_parameters.job = jobs.id
-  group by tasks.job,
-           worker_id;
+  where    task_status.latest
+  group by tasks.job;
+
+
+commit;
+
 
 -- Tasks ready to be actioned
 create view if not exists todo as
