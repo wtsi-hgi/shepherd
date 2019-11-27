@@ -227,12 +227,12 @@ create index if not exists attempts_completed on attempts(task, exit_code) where
 -- Task status: An annotated view of attempts, which includes tasks that
 -- have yet to be attempted; the latter of which have an attempt index
 -- of 0 and are semantically "unsuccessful".
-create view if not exists task_status as
+create view task_status as
   select attempts.task,                                                    -- Task ID
          row_number() over history as attempt,                             -- Attempt index
          attempts.start,                                                   -- Start timestamp
          attempts.finish,                                                  -- Finish timestamp
-         attempts.exit_code                                                -- Exit code
+         attempts.exit_code,                                               -- Exit code
          (row_number() over history) = (count(1) over history) as latest,  -- Latest predicate
          attempts.exit_code = 0 as succeeded                               -- Success predicate (null => in progress)
   from   attempts
@@ -260,8 +260,8 @@ create view if not exists task_status as
 -- that source-target pairs will be unique in any given job. This isn't
 -- an unreasonable assumption, given the context of our goal, but
 -- expectations ought to be managed.)
-create view if not exists job_throughput as
-  select   job.id         as job,     -- Job ID
+create view job_throughput as
+  select   jobs.id        as job,     -- Job ID
            source_fs.name as source,  -- Source filesystem (name)
            target_fs.name as target,  -- Target filesystem (name)
 
@@ -305,13 +305,13 @@ create view if not exists job_throughput as
            -- ought to be faster than alternatives.
   where    task_status.exit_code is not null
 
-  group by job.id,
+  group by jobs.id,
            source_fs.name,
            target_fs.name;
 
 
 -- Job status: A view of counts of task states per job.
-create view if not exists job_staus as
+create view job_status as
   select   tasks.job,
 
            -- Pending: Failed tasks with fewer attempts than maximum
