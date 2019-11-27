@@ -261,9 +261,9 @@ create view task_status as
 -- an unreasonable assumption, given the context of our goal, but
 -- expectations ought to be managed.)
 create view job_throughput as
-  select   jobs.id        as job,     -- Job ID
-           source_fs.name as source,  -- Source filesystem (name)
-           target_fs.name as target,  -- Target filesystem (name)
+  select   jobs.id           as job,     -- Job ID
+           source.filesystem as source,  -- Source filesystem
+           target.filesystem as target,  -- Target filesystem
 
            -- Mean successful task completion rate (bytes/second)
            -- TODO Spread (e.g., standard deviation)?
@@ -288,15 +288,11 @@ create view job_throughput as
 
   join     data as source
   on       source.id = tasks.source
-  join     filesystems as source_fs
-  on       source_fs.id = source.filesystem
   join     size as source_size
   on       source_size.data = source.id
 
   join     data as target
   on       target.id = tasks.target
-  join     filesystems as target_fs
-  on       target_fs.id = target.filesystem
 
            -- Completed tasks only
            -- NOTE "succeeded is not null" won't work, because our zero
@@ -306,8 +302,8 @@ create view job_throughput as
   where    task_status.exit_code is not null
 
   group by jobs.id,
-           source_fs.name,
-           target_fs.name;
+           source.filesystem,
+           target.filesystem;
 
 
 -- Job status: A view of counts of task states per job.
@@ -352,35 +348,40 @@ create view job_status as
   group by tasks.job;
 
 
-commit;
+-- Tasks to do: A view of pending tasks and their estimated completion
+-- time: data size / transfer rate * (1 - failure rate)
+create view todo as
+  select    jobs.id  as job,
+            tasks.id as task,
 
+            -- Estimated time to completion (interval)
+            make_interval(secs => source_size.size / (stats.transfer_rate * (1 - stats.failure_rate))) as eta
 
--- Tasks ready to be actioned
-create view if not exists todo as
-  select    tasks.id as task,
-            tasks.job,
-            source.filesystem as source_filesystem,
-            source.address    as source_address,
-            target.filesystem as target_filesystem,
-            target.address    as target_address,
-            tasks.script
   from      task_status
   join      tasks
   on        tasks.id = task_status.task
-  left join task_status as dependency
-  on        dependency.task = tasks.dependency
-  join      data as source
-  on        source.id = tasks.source
-  join      data as target
-  on        target.id = tasks.target
   join      jobs
   on        jobs.id = tasks.job
-  join      job_parameters
-  on        job_parameters.job = jobs.id
+  left join task_status as dependency
+  on        dependency.task = tasks.dependency
+
+  join      data as source
+  on        source.id = tasks.source
+  join      size as source_size
+  on        source_size.data = source.id
+
+  join      data as target
+  on        target.id = tasks.target
+
+  join      job_throughput as stats
+  on        stats.job   = jobs.id
+  and       stats.source = source.filesystem
+  and       stats.target = target.filesystem
+
   where     jobs.finish is null
-  and       task_status.exit_code is not null
-  and       task_status.exit_code != 0
-  and       (tasks.dependency is null or dependency.exit_code = 0)
-  and       task_status.attempt < job_parameters.max_attempts;
+  and       task_status.latest
+  and       task_status.attempt < jobs.max_attempts
+  and       (tasks.dependency is null or dependency.succeeded)
+  and       not task_status.succeeded;
 
 commit;
