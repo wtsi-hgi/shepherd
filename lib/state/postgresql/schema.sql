@@ -221,6 +221,8 @@ create index if not exists attempts_task      on attempts(task);
 create index if not exists attempts_succeeded on attempts(task, attempt, exit_code) where exit_code = 0;
 create index if not exists attempts_failed    on attempts(task, attempt, exit_code) where exit_code != 0;
 create index if not exists attempts_running   on attempts(task, attempt, exit_code) where exit_code is null;
+create index if not exists attempts_completed on attempts(task, attempt, exit_code) where exit_code is not null;
+
 
 -- Task status: An annotated view of attempts, which includes tasks that
 -- have yet to be attempted; the latter of which have an attempt index
@@ -251,6 +253,62 @@ create view if not exists task_status as
   left join attempts
   on        attempts.task = tasks.id
   where     attempts.task is null;
+
+
+-- Job throughput: A view of transfer and failure rates, based on the
+-- source and target filesystem pairs used in a job. (NOTE We assume
+-- that source-target pairs will be unique in any given job. This isn't
+-- an unreasonable assumption, given the context of our goal, but
+-- expectations ought to be managed.)
+create view if not exists job_throughput as
+  select   job.id         as job,     -- Job ID
+           source_fs.name as source,  -- Source filesystem (name)
+           target_fs.name as target,  -- Target filesystem (name)
+
+           -- Mean successful task completion rate (bytes/second)
+           -- TODO Spread (e.g., standard deviation)?
+           avg(case
+             when task_status.succeeded then
+               source_size.size / extract(epoch from task_status.finish - task_status.start)
+             else null
+           end) as transfer_rate,
+
+           -- Mean attempt failure rate
+           -- TODO Spread (e.g., standard deviation)?
+           avg(case
+             when task_status.succeeded then 0
+             else 1
+           end) as failure_rate
+
+  from     task_status
+  join     tasks
+  on       tasks.id = task_status.task
+  join     jobs
+  on       jobs.id = tasks.job
+
+  join     data as source
+  on       source.id = tasks.source
+  join     filesystems as source_fs
+  on       source_fs.id = source.filesystem
+  join     size as source_size
+  on       source_size.data = source.id
+
+  join     data as target
+  on       target.id = tasks.target
+  join     filesystems as target_fs
+  on       target_fs.id = target.filesystem
+
+           -- Completed tasks only
+           -- NOTE "succeeded is not null" won't work, because our zero
+           -- indexed (i.e., unattempted) tasks are marked as failed;
+           -- this condition should use the attempts_completed index, so
+           -- ought to be faster than alternatives.
+  where    task_status.exit_code is not null
+
+  group by job.id,
+           source_fs.name,
+           target_fs.name;
+
 
 commit;
 
