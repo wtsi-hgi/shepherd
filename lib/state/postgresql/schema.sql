@@ -218,10 +218,10 @@ create table if not exists attempts (
 );
 
 create index if not exists attempts_task      on attempts(task);
-create index if not exists attempts_succeeded on attempts(task, attempt, exit_code) where exit_code = 0;
-create index if not exists attempts_failed    on attempts(task, attempt, exit_code) where exit_code != 0;
-create index if not exists attempts_running   on attempts(task, attempt, exit_code) where exit_code is null;
-create index if not exists attempts_completed on attempts(task, attempt, exit_code) where exit_code is not null;
+create index if not exists attempts_succeeded on attempts(task, exit_code) where exit_code = 0;
+create index if not exists attempts_failed    on attempts(task, exit_code) where exit_code != 0;
+create index if not exists attempts_running   on attempts(task, exit_code) where exit_code is null;
+create index if not exists attempts_completed on attempts(task, exit_code) where exit_code is not null;
 
 
 -- Task status: An annotated view of attempts, which includes tasks that
