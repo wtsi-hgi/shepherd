@@ -222,120 +222,40 @@ create index if not exists attempts_succeeded on attempts(task, attempt, exit_co
 create index if not exists attempts_failed    on attempts(task, attempt, exit_code) where exit_code != 0;
 create index if not exists attempts_running   on attempts(task, attempt, exit_code) where exit_code is null;
 
+-- Task status: An annotated view of attempts, which includes tasks that
+-- have yet to be attempted; the latter of which have an attempt index
+-- of 0 and are semantically "unsuccessful".
+create view if not exists task_status as
+  select attempts.task,                                                    -- Task ID
+         row_number() over history as attempt,                             -- Attempt index
+         attempts.start,                                                   -- Start timestamp
+         attempts.finish,                                                  -- Finish timestamp
+         attempts.exit_code                                                -- Exit code
+         (row_number() over history) = (count(1) over history) as latest,  -- Latest predicate
+         attempts.exit_code = 0 as succeeded                               -- Success predicate (null => in progress)
+  from   attempts
+  window history as (partition by attempts.task
+                     order by     attempts.start asc)
+
+  union all
+
+  -- Unattempted tasks
+  select    tasks.id as task,
+            0        as attempt,
+            null     as start,
+            null     as finish,
+            null     as exit_code,
+            true     as latest,
+            false    as succeeded
+  from      tasks
+  left join attempts
+  on        attempts.task = tasks.id
+  where     attempts.task is null;
+
 commit;
 
 
 
-
-
--- create table if not exists jobs (
---   id               integer  primary key,
---   start            integer  not null default (strftime('%s', 'now')),
---   finish           integer  check (finish is null or finish >= start)
--- );
--- 
--- create index if not exists jobs_id on jobs(id);
--- 
--- create table if not exists job_parameters (
---   job              integer  primary key references jobs(id),
---   max_attempts     integer  not null check (max_attempts > 0),
---   max_concurrency  integer  not null check (max_concurrency > 0)
--- ) without rowid;
--- 
--- create index if not exists job_params_job on job_parameters(job);
--- 
--- create table if not exists data (
---   id          integer  primary key,
---   filesystem  text     not null,
---   address     text     not null
--- );
--- 
--- create index if not exists data_id on data(id);
--- create index if not exists data_location on data(filesystem, address);
--- 
--- create table if not exists checksums (
---   data       integer  references data(id),
---   algorithm  text     not null,
---   checksum   text     not null,
--- 
---   primary key (data, algorithm)
--- ) without rowid;
--- 
--- create index if not exists checksum_data on checksums(data);
--- create index if not exists checksum_checksum on checksums(data, algorithm);
--- 
--- create table if not exists sizes (
---   data  integer  primary key references data(id),
---   size  integer  not null
--- ) without rowid;
--- 
--- create index if not exists sizes_data on sizes(data);
--- 
--- create table if not exists metadata (
---   data   integer  references data(id),
---   key    text     not null,
---   value  text     not null,
--- 
---   primary key (data, key)
--- ) without rowid;
--- 
--- create index if not exists metadata_data on metadata(data);
--- create index if not exists metadata_metadata on metadata(data, key);
--- 
--- create table if not exists tasks (
---   id          integer  primary key,
---   job         integer  not null references jobs(id),
---   source      integer  not null references data(id),
---   target      integer  not null references data(id) check (source != target),
---   script      text     not null,
---   dependency  integer  null references tasks(id) check (dependency is null or dependency != id),
--- 
---   unique (job, target),
---   unique (job, source, target)
--- );
--- 
--- create index if not exists tasks_id on tasks(id);
--- create index if not exists tasks_job on tasks(job);
--- 
--- create table if not exists attempts (
---   task       integer  references tasks(id),
--- 
---   -- NOTE The attempt ID must be an ascending integer, starting from 1
---   attempt    integer  not null,
--- 
---   start      integer  not null default (strftime('%s', 'now')),
---   finish     integer  check (finish is null or finish >= start),
---   exit_code  integer  default (null),
--- 
---   primary key (task, attempt)
--- );
--- 
--- create index if not exists attempts_task on attempts(task);
--- create index if not exists attempts_attempt on attempts(task, attempt);
--- create index if not exists attempts_succeeded on attempts(task, attempt, exit_code) where exit_code = 0;
--- create index if not exists attempts_failed on attempts(task, attempt, exit_code) where exit_code is not null and exit_code != 0;
--- create index if not exists attempts_running on attempts(task, attempt, exit_code) where exit_code is null;
-
-create view if not exists task_status as
-  select    latest.task,
-            latest.attempt,
-            latest.exit_code
-  from      attempts as latest
-  left join attempts as later
-  on        later.task    = latest.task
-  and       later.attempt > latest.attempt
-  where     later.task   is null
-
-  union all
-
-  -- NOTE Unattempted tasks are denoted as "failed"
-  select    tasks.id as task,
-            0        as attempt,
-            1        as exit_code
-  from      tasks
-  left join attempts
-  on        attempts.task  = tasks.id
-  where     attempts.task is null;
 
 -- Overall job status, partitioned by worker
 create view if not exists job_status as
