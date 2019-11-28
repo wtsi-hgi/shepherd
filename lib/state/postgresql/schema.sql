@@ -21,7 +21,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-11-22';
+  schema date := timestamp '2019-11-27';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
