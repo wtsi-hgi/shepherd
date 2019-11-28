@@ -21,7 +21,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-11-27';
+  schema date := timestamp '2019-11-28';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -227,7 +227,7 @@ create index if not exists attempts_completed on attempts(task, exit_code) where
 -- Task status: An annotated view of attempts, which includes tasks that
 -- have yet to be attempted; the latter of which have an attempt index
 -- of 0 and are semantically "unsuccessful".
-create view task_status as
+create or replace view task_status as
   select attempts.task,                                                    -- Task ID
          row_number() over history as attempt,                             -- Attempt index
          attempts.start,                                                   -- Start timestamp
@@ -260,7 +260,7 @@ create view task_status as
 -- that source-target pairs will be unique in any given job. This isn't
 -- an unreasonable assumption, given the context of our goal, but
 -- expectations ought to be managed.)
-create view job_throughput as
+create or replace view job_throughput as
   select   jobs.id           as job,     -- Job ID
            source.filesystem as source,  -- Source filesystem
            target.filesystem as target,  -- Target filesystem
@@ -307,7 +307,7 @@ create view job_throughput as
 
 
 -- Job status: A view of counts of task states per job.
-create view job_status as
+create or replace view job_status as
   select   tasks.job,
 
            -- Pending: Failed tasks with fewer attempts than maximum
@@ -350,7 +350,7 @@ create view job_status as
 
 -- Tasks to do: A view of pending tasks and their estimated completion
 -- time: data size / transfer rate * (1 - failure rate)
-create view todo as
+create or replace view todo as
   select    jobs.id  as job,
             tasks.id as task,
 
