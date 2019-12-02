@@ -44,6 +44,11 @@ create table if not exists jobs (
     serial
     primary key,
 
+  -- Client reference
+  client
+    text
+    not null,
+
   -- Maximum number of attempts per transfer
   max_attempts
     integer
@@ -62,19 +67,12 @@ create table if not exists jobs (
     check (finish is null or finish >= start)
 );
 
-
--- Clients
--- Allows clients to store job-related data specific to its operation
-create table if not exists client_metadata (
+-- Job metadata
+create table if not exists job_metadata (
   job
     integer
     not null
     references jobs(id),
-
-  -- Client reference
-  client
-    text
-    not null,
 
   -- Key/value pair
   key
@@ -85,7 +83,7 @@ create table if not exists client_metadata (
     text
     not null,
 
-  primary key (job, client, key)
+  primary key (job, key)
 );
 
 
