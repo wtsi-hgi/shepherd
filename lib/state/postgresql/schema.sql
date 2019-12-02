@@ -21,7 +21,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-11-28';
+  schema date := timestamp '2019-12-02';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -60,6 +60,32 @@ create table if not exists jobs (
   finish
     timestamp with time zone
     check (finish is null or finish >= start)
+);
+
+
+-- Clients
+-- Allows clients to store job-related data specific to its operation
+create table if not exists client_metadata (
+  job
+    integer
+    not null
+    references jobs(id),
+
+  -- Client reference
+  client
+    text
+    not null,
+
+  -- Key/value pair
+  key
+    text
+    not null,
+
+  value
+    text
+    not null,
+
+  primary key (job, client, key)
 );
 
 
