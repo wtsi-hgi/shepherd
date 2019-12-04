@@ -21,7 +21,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-12-02';
+  schema date := timestamp '2019-12-04';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -54,17 +54,6 @@ create table if not exists jobs (
     integer
     not null
     check (max_attempts > 0),
-
-  -- Job start timestamp
-  start
-    timestamp with time zone
-    not null
-    default now(),
-
-  -- Job finish timestamp
-  finish
-    timestamp with time zone
-    check (finish is null or finish >= start)
 );
 
 -- Job metadata
@@ -84,6 +73,35 @@ create table if not exists job_metadata (
     not null,
 
   primary key (job, key)
+);
+
+-- Job timestamps
+do $$ begin
+  create type job_phase as enum ('prepare', 'transfer');
+  exception
+    when duplicate_object then null;
+end $$;
+
+create table if not exists job_timestamps (
+  job
+    integer
+    not null
+    references jobs(id),
+
+  phase
+    job_phase
+    not null,
+
+  start
+    timestamp with time zone
+    not null
+    default now(),
+
+  finish
+    timestamp with time zone
+    check (finish is null or finish >= start),
+
+  primary key (job, phase)
 );
 
 
@@ -389,6 +407,10 @@ create or replace view todo as
   left join task_status as dependency
   on        dependency.task = tasks.dependency
 
+  left join job_timestamps as transfer
+  on        transfer.job   = jobs.id
+  and       transfer.phase = 'transfer'
+
   join      data as source
   on        source.id = tasks.source
   join      size as source_size
@@ -402,7 +424,7 @@ create or replace view todo as
   and       stats.source = source.filesystem
   and       stats.target = target.filesystem
 
-  where     jobs.finish is null
+  where     transfer.finish is null
   and       task_status.latest
   and       task_status.attempt < jobs.max_attempts
   and       (tasks.dependency is null or dependency.succeeded)
