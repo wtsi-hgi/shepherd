@@ -26,14 +26,16 @@ with this program. If not, see https://www.gnu.org/licenses/
 #       +-- BackendException
 #       |
 #       +-- DataException
-#       |    |
-#       |    +-- DataNotReady
-#       |    |
-#       |    +-- WorkerRedundant
-#       |    |
-#       |    +-- NoCommonChecksumAlgorithm
-#       |
-#       +-- PhaseNotStarted
+#            |
+#            +-- DataNotReady
+#            |    |
+#            |    +-- PhaseNotStarted
+#            |    |
+#            |    +-- NoThroughputData
+#            |
+#            +-- WorkerRedundant
+#            |
+#            +-- NoCommonChecksumAlgorithm
 
 class StateException(Exception):
     """ Base state engine exception """
@@ -47,6 +49,12 @@ class DataException(StateException):
 class DataNotReady(DataException):
     """ Raised when data is not yet available """
 
+class PhaseNotStarted(DataNotReady):
+    """ Raised when a phase is queried but hasn't started """
+
+class NoThroughputData(DataNotReady):
+    """ Raised when no relevant throughput data is available """
+
 class WorkerRedundant(DataException):
     """ Raised when a worker has nothing to do """
     # FIXME Does this belong here?
@@ -54,6 +62,3 @@ class WorkerRedundant(DataException):
 class NoCommonChecksumAlgorithm(DataException):
     """ Raised when filesystems do not share a common checksumming algorithm """
     # FIXME Does this belong here?
-
-class PhaseNotStarted(StateException):
-    """ Raised when a phase is queried but hasn't started """

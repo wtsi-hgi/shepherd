@@ -28,7 +28,16 @@ from enum import Enum, auto
 from common import types as T, time
 from common.models.task import Task
 from common.models.filesystems.types import BaseFilesystem
-from .exceptions import PhaseNotStarted
+from .exceptions import *
+
+
+@dataclass(frozen=True)
+class JobThroughput:
+    """ Model of throughput rates between filesystems """
+    source:BaseFilesystem
+    target:BaseFilesystem
+    transfer_rate:float  # bytes/second
+    failure_rate:float   # Probability
 
 
 class JobPhase(Enum):
@@ -69,18 +78,30 @@ class _TaskOverviewMixin:
 
 class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
     """
-    Abstract base class for job task and phase overview
+    Abstract base class for job and phase status
 
     Implementations required:
-    * phase :: JobPhase -> PhaseStatus
+    * throughput :: BaseFilesystem x BaseFilesystem -> JobThroughput
+    * phase      :: JobPhase -> PhaseStatus
     """
+    @abstractmethod
+    def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
+        """
+        Return the throughput rates between the given filesystems
+
+        @param   source            Source filesystem
+        @param   target            Target filesystem
+        @raise   NoThroughputData  No throughtput data available
+        @return  Job throughput
+        """
+
     @abstractmethod
     def phase(self, phase:JobPhase) -> PhaseStatus:
         """
-        Return the phase status for the specified phase; should raise
-        PhaseNotStarted when the specified phase has yet to start
+        Return the phase status for the specified phase
 
-        @param   phase  Job phase
+        @param   phase            Job phase
+        @raise   PhaseNotStarted  Phase has yet to start
         @return  Phase status
         """
 
@@ -95,13 +116,6 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
             return False
 
 
-@dataclass(frozen=True)
-class JobThroughput:
-    """ Model of throughput rates between filesystems """
-    source:BaseFilesystem
-    target:BaseFilesystem
-    transfer_rate:float  # bytes/second
-    failure_rate:float   # Probability
 
 
 
