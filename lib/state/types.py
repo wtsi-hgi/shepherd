@@ -26,9 +26,30 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 from common import types as T, time
-from common.models.task import Task
-from common.models.filesystems.types import BaseFilesystem
+from common.models.task import ExitCode, Task
+from common.models.filesystems.types import BaseFilesystem, Data
 from .exceptions import *
+
+
+# Verification failure handling
+_MISMATCHED_SIZE     = ExitCode(-1)
+_MISMATCHED_CHECKSUM = ExitCode(-2)
+
+class _VerificationFailure(Exception):
+    """ Raised on verification failure """
+
+
+@dataclass
+class _DurationMixin:
+    """ Model for durations """
+    start:T.DateTime
+    finish:T.Optional[T.DateTime] = None
+
+    @property
+    def runtime(self) -> T.TimeDelta:
+        """ Phase runtime """
+        until = self.finish or time.now()
+        return until - self.start
 
 
 @dataclass(frozen=True)
@@ -47,21 +68,13 @@ class JobPhase(Enum):
 
 
 @dataclass(frozen=True)
-class PhaseStatus:
+class PhaseStatus(_DurationMixin):
     """ Model for expressing phase status """
     phase:JobPhase
-    start:T.DateTime
-    finish:T.Optional[T.DateTime] = None
 
     def __bool__(self) -> bool:
         # Truthy while there's no finish timestamp (i.e., in progress)
         return self.finish is None
-
-    @property
-    def runtime(self) -> T.TimeDelta:
-        """ Phase runtime """
-        until = self.finish or time.now()
-        return until - self.start
 
 
 @dataclass(frozen=True)
@@ -117,11 +130,76 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
             return False
 
 
-class BaseAttempt(metaclass=ABCMeta):
+@dataclass
+class _AttemptMixin(_DurationMixin):
+    """ Model of task attempts """
+    # FIXME _DurationMixin has a default property and defaults need to
+    # be at the end, for the constructor
+    task:Task
+
+class BaseAttempt(_AttemptMixin, metaclass=ABCMeta):
     """
     Abstract base class for task attempts
+
+    Implementations required:
+    * size      :: Data -> int
+    * checksum  :: Data x algorithm -> int
+    * exit_code :: Getter () -> ExitCode / Setter ExitCode -> None
     """
-    # TODO Fill in the blanks
+    @abstractmethod
+    def size(self, data:Data) -> int:
+        """ Persist and return the data size """
+
+    @abstractmethod
+    def checksum(self, data:Data, algorithm:str) -> str:
+        """ Persist and return the data checksum """
+
+    @property
+    @abstractmethod
+    def exit_code(self) -> ExitCode:
+        """
+        Fetch the task's exit code for this attempt, if available
+
+        @raise  DataNotReady  No exit code yet available
+        """
+
+    @exit_code.setter
+    @abstractmethod
+    def exit_code(self, value:ExitCode) -> None:
+        """ Persist the task's exit code for this attempt """
+
+    def __call__(self) -> bool:
+        """ Attempt the task """
+        source = self.task.source
+        target = self.task.target
+
+        # TODO Run these in separate processes
+        source_size = self.size(source)
+        source_checksum = self.checksum(source, "TODO")
+
+        # Run task
+        self.exit_code = success = self.task()
+
+        if success:
+            try:
+                target_size = self.size(target)
+                if source_size != target_size:
+                    # TODO Log
+                    self.exit_code = _MISMATCHED_SIZE
+                    raise _VerificationFailure()
+
+                target_checksum = self.checksum(target, "TODO")
+                if source_checksum != target_checksum:
+                    # TODO Log
+                    self.exit_code = _MISMATCHED_CHECKSUM
+                    raise _VerificationFailure()
+
+                # TODO Set metadata?
+
+            except _VerificationFailure:
+                pass
+
+        # TODO Set attempt finish time
 
 
 @dataclass
