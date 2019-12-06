@@ -28,6 +28,7 @@ from enum import Enum, auto
 from common import types as T, time
 from common.models.task import Task
 from common.models.filesystems.types import BaseFilesystem
+from .exceptions import PhaseNotStarted
 
 
 class JobPhase(Enum):
@@ -76,7 +77,8 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
     @abstractmethod
     def phase(self, phase:JobPhase) -> PhaseStatus:
         """
-        Return the phase status for the specified phase
+        Return the phase status for the specified phase; should raise
+        PhaseNotStarted when the specified phase has yet to start
 
         @param   phase  Job phase
         @return  Phase status
@@ -86,7 +88,11 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
     def complete(self) -> bool:
         # Truthy when the transfer phase has ended (n.b., which is
         # dependent on the preparation phase ending)
-        return not self.phase(JobPhase.Transfer)
+        try:
+            return not self.phase(JobPhase.Transfer)
+
+        except PhaseNotStarted:
+            return False
 
 
 @dataclass(frozen=True)
