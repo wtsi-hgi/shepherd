@@ -109,6 +109,7 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
     def complete(self) -> bool:
         # Truthy when the transfer phase has ended (n.b., which is
         # dependent on the preparation phase ending)
+        # NOTE Completion does not imply success!
         try:
             return not self.phase(JobPhase.Transfer)
 
@@ -116,75 +117,72 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
             return False
 
 
+class BaseAttempt(metaclass=ABCMeta):
+    """
+    Abstract base class for task attempts
+    """
+    # TODO Fill in the blanks
 
 
+@dataclass
+class DependentTask:
+    """ Model of sequence of task dependencies """
+    task:Task
+    dependency:T.Optional[DependentTask] = None
 
 
-
-# TODO Adaptors for Data and Task that augment them with machinery to
-# track and update persisted state (maybe an ABC mixin?)
-
-
-class BaseJob(T.Iterator[Task], metaclass=ABCMeta):
+class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     """
     Abstract base class for jobs
 
     Implementations required:
-    * __init__ :: Any x Optional[Identifier] x bool -> None
-    * __iadd__ :: Task -> BaseJob
-    * __next__ :: () -> Task
-    * status   :: () -> JobStatus
+    * __init__     :: Any x String x Optional[Identifier] x bool -> None
+    * __iadd__     :: DependentTask -> BaseJob
+    * __next__     :: () -> BaseAttempt
+    * max_attempts :: Getter () -> int / Setter int -> None
+    * status       :: Getter () -> BaseJobStatus
     """
+    _client_id:str
     _job_id:T.Identifier
-    _filesystems:T.Dict[str, BaseFilesystem]
 
     @abstractmethod
-    def __init__(self, state:T.Any, *, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
+    def __init__(self, state:T.Any, *, client_id:str, max_attempts:int = 3, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
         """
         Constructor
 
         @param  state          Object that describes the persisted state
+        @param  client_id      Client identifier
         @param  job_id         Job ID for a running job
+        @param  max_attempts   Maximum attempts
         @param  force_restart  Whether to forcibly resume a job
         """
 
-    @property
-    def job_id(self) -> T.Identifier:
-        return self._job_id
-
     @abstractmethod
-    def __iadd__(self, task:Task) -> BaseJob:
-        """ Add a task to the job """
+    def __iadd__(self, task:DependentTask) -> BaseJob:
+        """ Add a sequence of dependent tasks to the job """
 
     def __iter__(self) -> BaseJob:
         return self
 
     @abstractmethod
-    def __next__(self) -> Task:
-        """ Fetch the next pending task to execute """
+    def __next__(self) -> BaseAttempt:
+        """ Fetch the next pending task to attempt """
+
+    @property
+    def job_id(self) -> T.Identifier:
+        return self._job_id
 
     @property
     @abstractmethod
-    def status(self) -> JobStatus:
-        """ Get the current job status """
+    def max_attempts(self) -> int:
+        """ Get the maximum number of attempts for a task """
 
-    # TODO
-    # * Exposure of maximum attempts and concurrency
-    #   (FIXME the maximum concurrency is a property of the filesystems
-    #   involved in a task, rather than that of an entire job...)
-    # * Setting and/or checking of checksums, sizes and metadata
-    # * Checksumming is not necessarily an operation provided by the
-    #   filesystem and therefore needs to be done manually, which takes
-    #   time; i.e., it's wrong to assume we can just get the checksum
-    #   without potentially blocking for ages
-    # * How to keep track of attempts?
+    @max_attempts.setter
+    @abstractmethod
+    def max_attempts(self, value:int) -> None:
+        """ Set the maximum number of attempts for a task """
 
-    # FIXME? This injection is a bit primitive...
     @property
-    def filesystem_mapping(self) -> T.Dict[str, BaseFilesystem]:
-        return self._filesystems
-
-    @filesystem_mapping.setter
-    def filesystem_mapping(self, mapping:T.Dict[str, BaseFilesystem]) -> None:
-        """ Inject filesystem mappings """
-        self._filesystems = mapping
+    @abstractmethod
+    def status(self) -> BaseJobStatus:
+        """ Get the current job status """
