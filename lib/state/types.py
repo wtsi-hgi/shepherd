@@ -23,33 +23,82 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
+from enum import Enum, auto
 
 from common import types as T, time
 from common.models.task import Task
 from common.models.filesystems.types import BaseFilesystem
 
 
-@dataclass
-class JobStatus:
-    """ Model for expressing job task status and properties """
+class JobPhase(Enum):
+    """ Enumeration of job phases """
+    Preparation = auto()
+    Transfer    = auto()
+
+
+@dataclass(frozen=True)
+class PhaseStatus:
+    """ Model for expressing phase status """
+    phase:JobPhase
+    start:T.DateTime
+    finish:T.Optional[T.DateTime] = None
+
+    def __bool__(self) -> bool:
+        # Truthy while there's no finish timestamp (i.e., in progress)
+        return self.finish is None
+
+    @property
+    def runtime(self) -> T.TimeDelta:
+        """ Phase runtime """
+        until = self.finish or time.now()
+        return until - self.start
+
+
+@dataclass(frozen=True)
+class _TaskOverviewMixin:
+    """ Model for expressing job task overview """
     pending:int
     running:int
     failed:int
     succeeded:int
 
-    start:T.DateTime
-    finish:T.Optional[T.DateTime] = None
-
     def __bool__(self) -> bool:
-        # Return truthy if there are still jobs pending
-        # TODO ...or running??
+        # Truthy when there are still jobs pending (i.e., in progress)
         return self.pending > 0
 
+class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
+    """
+    Abstract base class for job task and phase overview
+
+    Implementations required:
+    * phase :: JobPhase -> PhaseStatus
+    """
+    @abstractmethod
+    def phase(self, phase:JobPhase) -> PhaseStatus:
+        """
+        Return the phase status for the specified phase
+
+        @param   phase  Job phase
+        @return  Phase status
+        """
+
     @property
-    def runtime(self) -> T.TimeDelta:
-        """ Job runtime """
-        until = self.finish or time.now()
-        return until - self.start
+    def complete(self) -> bool:
+        # Truthy when the transfer phase has ended (n.b., which is
+        # dependent on the preparation phase ending)
+        return not self.phase(JobPhase.Transfer)
+
+
+@dataclass(frozen=True)
+class JobThroughput:
+    """ Model of throughput rates between filesystems """
+    source:BaseFilesystem
+    target:BaseFilesystem
+    transfer_rate:float  # bytes/second
+    failure_rate:float   # Probability
+
+
+
 
 
 # TODO Adaptors for Data and Task that augment them with machinery to
