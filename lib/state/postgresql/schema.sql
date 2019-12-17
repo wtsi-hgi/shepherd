@@ -163,7 +163,7 @@ create table if not exists size (
     check (size >= 0)
 );
 
-create table if not exists checksum (
+create table if not exists checksums (
   data
     integer
     not null
