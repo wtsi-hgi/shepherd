@@ -19,9 +19,10 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 begin transaction;
 
+
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-12-04';
+  schema date := timestamp '2019-12-17';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -53,7 +54,7 @@ create table if not exists jobs (
   max_attempts
     integer
     not null
-    check (max_attempts > 0),
+    check (max_attempts > 0)
 );
 
 -- Job metadata
@@ -111,10 +112,21 @@ create table if not exists filesystems (
     serial
     primary key,
 
-  -- Filesystem name
+  job
+    integer
+    not null
+    references jobs(id),
+
+  -- Filesystem name/identifier
   name
     text
+    not null,
+
+  -- Maximum I/O concurrency of the filesystem
+  max_concurrency
+    integer
     not null
+    check (max_concurrency > 0)
 );
 
 
@@ -348,9 +360,13 @@ create or replace view job_throughput as
            target.filesystem;
 
 
--- Job status: A view of counts of task states per job.
+-- Job status: A view of counts of task states, by filesystem pair, per
+-- job. (This can be aggregated by the client to get job totals; it is
+-- split by filesystem to control concurrency limits.)
 create or replace view job_status as
-  select   tasks.job,
+  select   tasks.job,                    -- Job ID
+           source.filesystem as source,  -- Source filesystem
+           target.filesystem as target,  -- Target filesystem
 
            -- Pending: Failed tasks with fewer attempts than maximum
            sum(case
@@ -386,15 +402,58 @@ create or replace view job_status as
   on       tasks.id = task_status.task
   join     jobs
   on       jobs.id = tasks.job
+
+  join     data as source
+  on       source.id = tasks.source
+  join     data as target
+  on       target.id = tasks.target
+
   where    task_status.latest
-  group by tasks.job;
+
+  group by tasks.job,
+           source.filesystem,
+           target.filesystem;
 
 
--- Tasks to do: A view of pending tasks and their estimated completion
--- time: data size / transfer rate * (1 - failure rate)
+-- Filesystem status: A view of each filesystem's current load, per job.
+create or replace view filesystem_status as
+  with by_filesystem as (
+    -- Running tasks using source filesystem
+    select   job,
+             source       as filesystem,
+             sum(running) as concurrency
+    from     job_status
+    group by job,
+             filesystem
+
+    union all
+
+    -- Running tasks using target filesystem
+    select   job,
+             target       as filesystem,
+             sum(running) as concurrency
+    from     job_status
+    group by job,
+             filesystem
+  )
+  select    by_filesystem.job,                                   -- Job ID
+            by_filesystem.filesystem,                            -- Filesystem ID
+            sum(concurrency)                 as concurrency,     -- Current load
+            max(filesystems.max_concurrency) as max_concurrency  -- Maximum capacity
+
+  from      by_filesystem
+  join      filesystems
+  on        filesystems.id = by_filesystem.filesystem
+
+  group by  by_filesystem.job,
+            by_filesystem.filesystem;
+
+
+-- Tasks to do: A view of permissible pending tasks and their estimated
+-- completion time: data size / transfer rate * (1 - failure rate)
 create or replace view todo as
-  select    jobs.id  as job,
-            tasks.id as task,
+  select    jobs.id  as job,   -- Job ID
+            tasks.id as task,  -- Task ID
 
             -- Estimated time to completion (interval)
             make_interval(secs => source_size.size / (stats.transfer_rate * (1 - stats.failure_rate))) as eta
@@ -415,19 +474,25 @@ create or replace view todo as
   on        source.id = tasks.source
   join      size as source_size
   on        source_size.data = source.id
+  join      filesystem_status as source_fs
+  on        source_fs.filesystem = source.filesystem
 
   join      data as target
   on        target.id = tasks.target
+  join      filesystem_status as target_fs
+  on        target_fs.filesystem = target.filesystem
 
   join      job_throughput as stats
-  on        stats.job   = jobs.id
+  on        stats.job    = jobs.id
   and       stats.source = source.filesystem
   and       stats.target = target.filesystem
 
-  where     transfer.finish is null
-  and       task_status.latest
-  and       task_status.attempt < jobs.max_attempts
-  and       (tasks.dependency is null or dependency.succeeded)
-  and       not task_status.succeeded;
+  where     transfer.finish is null                             -- Transfer phase in progress
+  and       task_status.latest                                  -- Latest attempt for the task
+  and       task_status.attempt   < jobs.max_attempts           -- Retries remaining
+  and       source_fs.concurrency < source_fs.max_concurrency   -- Source filesystem under-capacity
+  and       target_fs.concurrency < target_fs.max_concurrency   -- Target filesystem under-capacity
+  and       (tasks.dependency is null or dependency.succeeded)  -- No/resolved dependency
+  and       not task_status.succeeded;                          -- Task has yet to succeed
 
 commit;
