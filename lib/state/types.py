@@ -26,8 +26,9 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 from common import types as T, time
+from common.logging import log, Level
 from common.models.task import ExitCode, Task
-from common.models.filesystems.types import BaseFilesystem, Data
+from common.models.filesystems.types import BaseFilesystem
 from .exceptions import *
 
 
@@ -43,7 +44,7 @@ class _VerificationFailure(Exception):
 class _DurationMixin:
     """ Model for durations """
     start:T.DateTime
-    finish:T.Optional[T.DateTime] = None
+    finish:T.Optional[T.DateTime]
 
     @property
     def runtime(self) -> T.TimeDelta:
@@ -51,12 +52,33 @@ class _DurationMixin:
         until = self.finish or time.now()
         return until - self.start
 
+class _BaseDurationMixin(_DurationMixin, metaclass=ABCMeta):
+    """
+    Abstract base class for setting the start and finish timestamps
+
+    Implementations required:
+    * init :: () -> T.DateTime
+    * stop :: () -> T.DateTime
+    """
+    @abstractmethod
+    def init(self) -> T.DateTime:
+        """ Persist and return the duration start timestamp """
+
+    @abstractmethod
+    def stop(self) -> T.DateTime:
+        """ Persist and return the duration finish timestamp """
+
+    def __enter__(self) -> None:
+        self.init()
+
+    def __exit__(self, *exception) -> bool:
+        self.stop()
+        return not exception  # FIXME? Is this right?
+
 
 @dataclass(frozen=True)
 class JobThroughput:
     """ Model of throughput rates between filesystems """
-    source:BaseFilesystem
-    target:BaseFilesystem
     transfer_rate:float  # bytes/second
     failure_rate:float   # Probability
 
@@ -67,11 +89,8 @@ class JobPhase(Enum):
     Transfer    = auto()
 
 
-@dataclass(frozen=True)
-class PhaseStatus(_DurationMixin):
-    """ Model for expressing phase status """
-    phase:JobPhase
-
+class BasePhaseStatus(_BaseDurationMixin, metaclass=ABCMeta):
+    """ Abstract base class for phase status """
     def __bool__(self) -> bool:
         # Truthy while there's no finish timestamp (i.e., in progress)
         return self.finish is None
@@ -85,18 +104,19 @@ class _TaskOverviewMixin:
     failed:int
     succeeded:int
 
-    def __bool__(self) -> bool:
-        # Truthy when there are still jobs pending (i.e., in progress)
-        return self.pending > 0
-
 class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
     """
     Abstract base class for job and phase status
 
     Implementations required:
     * throughput :: BaseFilesystem x BaseFilesystem -> JobThroughput
-    * phase      :: JobPhase -> PhaseStatus
+    * phase      :: JobPhase -> BasePhaseStatus
     """
+    def __bool__(self) -> bool:
+        # Truthy when the preparation phase is still in progress or
+        # there are still jobs pending (i.e., in progress)
+        return self.phase(JobPhase.Preparation) or self.pending > 0
+
     @abstractmethod
     def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
         """
@@ -109,7 +129,7 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def phase(self, phase:JobPhase) -> PhaseStatus:
+    def phase(self, phase:JobPhase) -> BasePhaseStatus:
         """
         Return the phase status for the specified phase
 
@@ -130,29 +150,33 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
             return False
 
 
+class DataOrigin(Enum):
+    """ Enumeration of data origins """
+    Source = auto()
+    Target = auto()
+
+
 @dataclass
-class _AttemptMixin(_DurationMixin):
+class _AttemptMixin:
     """ Model of task attempts """
-    # FIXME _DurationMixin has a default property and defaults need to
-    # be at the end, for the constructor
     task:Task
 
-class BaseAttempt(_AttemptMixin, metaclass=ABCMeta):
+class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
     """
     Abstract base class for task attempts
 
     Implementations required:
-    * size      :: Data -> int
-    * checksum  :: Data x algorithm -> int
+    * size      :: DataOrigin -> int
+    * checksum  :: DataOrigin x str -> int
     * exit_code :: Getter () -> ExitCode / Setter ExitCode -> None
     """
     @abstractmethod
-    def size(self, data:Data) -> int:
-        """ Persist and return the data size """
+    def size(self, origin:DataOrigin) -> int:
+        """ Persist and return the origin's data size """
 
     @abstractmethod
-    def checksum(self, data:Data, algorithm:str) -> str:
-        """ Persist and return the data checksum """
+    def checksum(self, origin:DataOrigin, algorithm:str) -> str:
+        """ Persist and return the origin's data checksum """
 
     @property
     @abstractmethod
@@ -170,36 +194,50 @@ class BaseAttempt(_AttemptMixin, metaclass=ABCMeta):
 
     def __call__(self) -> bool:
         """ Attempt the task """
-        source = self.task.source
-        target = self.task.target
+        # The context manager sets the attempt start and finish timestamps
+        with self:
+            task = self.task
+            log(f"Attempting transfer of {task.source.address} from {task.source.filesystem} "
+                f"to {task.target.filesystem} at {task.target.address}", Level.Info)
 
-        # TODO Run these in separate processes
-        source_size = self.size(source)
-        source_checksum = self.checksum(source, "TODO")
+            # TODO Run these in a separate thread
+            # TODO Different/multiple checksum algorithms
+            source_size     = self.size(DataOrigin.Source)
+            source_checksum = self.checksum(DataOrigin.Source, "md5")
 
-        # Run task
-        self.exit_code = success = self.task()
+            # Run task
+            self.exit_code = success = self.task()
 
-        if success:
-            try:
-                target_size = self.size(target)
-                if source_size != target_size:
-                    # TODO Log
-                    self.exit_code = _MISMATCHED_SIZE
-                    raise _VerificationFailure()
+            if not success:
+                log(f"Attempt failed with exit code {success.exit_code}", Level.Warning)
 
-                target_checksum = self.checksum(target, "TODO")
-                if source_checksum != target_checksum:
-                    # TODO Log
-                    self.exit_code = _MISMATCHED_CHECKSUM
-                    raise _VerificationFailure()
+            else:
+                try:
+                    target_size = self.size(DataOrigin.Target)
+                    if source_size != target_size:
+                        log(f"Attempt failed: "
+                            f"Source is {source_size} bytes, "
+                            f"target is {target_size} bytes", Level.Warning)
 
-                # TODO Set metadata?
+                        self.exit_code = success = _MISMATCHED_SIZE
+                        raise _VerificationFailure()
 
-            except _VerificationFailure:
-                pass
+                    # TODO Different/multiple checksum algorithms
+                    target_checksum = self.checksum(target, "md5")
+                    if source_checksum != target_checksum:
+                        log(f"Attempt failed: "
+                            f"Source has checksum {source_checksum}, "
+                            f"target has checksum {target_checksum}", Level.Warning)
 
-        # TODO Set attempt finish time
+                        self.exit_code = success = _MISMATCHED_CHECKSUM
+                        raise _VerificationFailure()
+
+                    # TODO Set metadata?
+
+                except _VerificationFailure:
+                    pass
+
+            return bool(success)
 
 
 @dataclass
@@ -208,30 +246,30 @@ class DependentTask:
     task:Task
     dependency:T.Optional[DependentTask] = None
 
-
 class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     """
     Abstract base class for jobs
 
     Implementations required:
-    * __init__     :: Any x String x Optional[Identifier] x bool -> None
+    * __init__     :: Any x String x Optional[Identifier] x Boolean -> None
     * __iadd__     :: DependentTask -> BaseJob
     * __next__     :: () -> BaseAttempt
-    * max_attempts :: Getter () -> int / Setter int -> None
+    * max_attempts :: Getter () -> Optional[Integer] / Setter Integer -> None
     * status       :: Getter () -> BaseJobStatus
+    * metadata     :: Getter () -> Dict[String, String]
+    * set_metadata :: kwargs -> None
     """
     _client_id:str
     _job_id:T.Identifier
 
     @abstractmethod
-    def __init__(self, state:T.Any, *, client_id:str, max_attempts:int = 3, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
+    def __init__(self, state:T.Any, *, client_id:str, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
         """
         Constructor
 
         @param  state          Object that describes the persisted state
         @param  client_id      Client identifier
         @param  job_id         Job ID for a running job
-        @param  max_attempts   Maximum attempts
         @param  force_restart  Whether to forcibly resume a job
         """
 
@@ -244,7 +282,7 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
 
     @abstractmethod
     def __next__(self) -> BaseAttempt:
-        """ Fetch the next pending task to attempt """
+        """ Fetch the next pending permissible task to attempt """
 
     @property
     def job_id(self) -> T.Identifier:
@@ -264,3 +302,12 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     @abstractmethod
     def status(self) -> BaseJobStatus:
         """ Get the current job status """
+
+    @property
+    @abstractmethod
+    def metadata(self) -> T.Dict[str, str]:
+        """ Get the client metadata """
+
+    @abstractmethod
+    def set_metadata(self, **metadata:str) -> None:
+        """ Set (insert/update) key-value client metadata """
