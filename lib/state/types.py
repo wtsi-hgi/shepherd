@@ -24,12 +24,13 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
+from concurrent.futures import ThreadPoolExecutor
 
 from common import types as T, time
 from common.logging import log, Level
 from common.models.task import ExitCode, Task
 from common.models.filesystems.types import BaseFilesystem
-from .exceptions import *
+from .exceptions import NoCommonChecksumAlgorithm, PhaseNotStarted
 
 
 # Verification failure handling
@@ -88,6 +89,10 @@ class JobPhase(Enum):
     Preparation = auto()
     Transfer    = auto()
 
+# Convenience aliases
+_PREPARATION = JobPhase.Preparation
+_TRANSFER    = JobPhase.Transfer
+
 
 class BasePhaseStatus(_BaseDurationMixin, metaclass=ABCMeta):
     """ Abstract base class for phase status """
@@ -115,7 +120,7 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
     def __bool__(self) -> bool:
         # Truthy when the preparation phase is still in progress or
         # there are still jobs pending (i.e., in progress)
-        return self.phase(JobPhase.Preparation) or self.pending > 0
+        return self.phase(_PREPARATION) or self.pending > 0
 
     @abstractmethod
     def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
@@ -144,7 +149,7 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
         # dependent on the preparation phase ending)
         # NOTE Completion does not imply success!
         try:
-            return not self.phase(JobPhase.Transfer)
+            return not self.phase(_TRANSFER)
 
         except PhaseNotStarted:
             return False
@@ -154,6 +159,10 @@ class DataOrigin(Enum):
     """ Enumeration of data origins """
     Source = auto()
     Target = auto()
+
+# Convenience aliases
+_SOURCE = DataOrigin.Source
+_TARGET = DataOrigin.Target
 
 
 @dataclass
@@ -166,17 +175,25 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
     Abstract base class for task attempts
 
     Implementations required:
-    * size      :: DataOrigin -> int
-    * checksum  :: DataOrigin x str -> int
+    * size      :: DataOrigin -> int         Must be thread-safe!
+    * checksum  :: DataOrigin x str -> int   Must be thread-safe!
     * exit_code :: Getter () -> ExitCode / Setter ExitCode -> None
     """
     @abstractmethod
     def size(self, origin:DataOrigin) -> int:
-        """ Persist and return the origin's data size """
+        """
+        Persist and return the origin's data size
+
+        NOTE Implementation must be thread-safe
+        """
 
     @abstractmethod
     def checksum(self, origin:DataOrigin, algorithm:str) -> str:
-        """ Persist and return the origin's data checksum """
+        """
+        Persist and return the origin's data checksum
+
+        NOTE Implementation must be thread-safe
+        """
 
     @property
     @abstractmethod
@@ -192,47 +209,57 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
     def exit_code(self, value:ExitCode) -> None:
         """ Persist the task's exit code for this attempt """
 
+    def _get_source_properties(self, *algorithms:str) -> T.Tuple[int, T.Dict[str, str]]:
+        # Fetch the source data's size and checksums using the specified
+        # algorithms (to be run internally in a separate thread)
+        return self.size(_SOURCE), \
+               {algorithm: self.checksum(_SOURCE, algorithm) for algorithm in algorithms}
+
     def __call__(self) -> bool:
-        """ Attempt the task """
+        """ Attempt the transfer task """
         # The context manager sets the attempt start and finish timestamps
         with self:
             task = self.task
             log(f"Attempting transfer of {task.source.address} from {task.source.filesystem} "
                 f"to {task.target.filesystem} at {task.target.address}", Level.Info)
 
-            # TODO Run these in a separate thread
             # TODO Different/multiple checksum algorithms
-            source_size     = self.size(DataOrigin.Source)
-            source_checksum = self.checksum(DataOrigin.Source, "md5")
+            executor = ThreadPoolExecutor(max_workers=1)
+            properties = executor.submit(self._get_source_properties, "md5")
 
-            # Run task
+            # Run task and join on properties thread results
             self.exit_code = success = self.task()
+            source_size, source_checksums = properties.result()
 
             if not success:
                 log(f"Attempt failed with exit code {success.exit_code}", Level.Warning)
 
             else:
                 try:
-                    target_size = self.size(DataOrigin.Target)
+                    target_size = self.size(_TARGET)
                     if source_size != target_size:
                         log(f"Attempt failed: "
-                            f"Source is {source_size} bytes, "
+                            f"Source is {source_size} bytes; "
                             f"target is {target_size} bytes", Level.Warning)
 
                         self.exit_code = success = _MISMATCHED_SIZE
                         raise _VerificationFailure()
 
                     # TODO Different/multiple checksum algorithms
-                    target_checksum = self.checksum(DataOrigin.Target, "md5")
+                    source_checksum = source_checksums["md5"]
+                    target_checksum = self.checksum(_TARGET, "md5")
                     if source_checksum != target_checksum:
                         log(f"Attempt failed: "
-                            f"Source has checksum {source_checksum}, "
+                            f"Source has checksum {source_checksum}; "
                             f"target has checksum {target_checksum}", Level.Warning)
 
                         self.exit_code = success = _MISMATCHED_CHECKSUM
                         raise _VerificationFailure()
 
-                    # TODO Set metadata?
+                    # TODO Data metadata: There is no need to set this
+                    # for each intermediary stage; just set the final
+                    # target metadata to that of the original source.
+                    # Think about how to implement this...
 
                 except _VerificationFailure:
                     pass
@@ -246,18 +273,19 @@ class DependentTask:
     task:Task
     dependency:T.Optional[DependentTask] = None
 
+
 class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     """
     Abstract base class for jobs
 
     Implementations required:
-    * __init__     :: Any x String x Optional[Identifier] x Boolean -> None
-    * __iadd__     :: DependentTask -> BaseJob
-    * attempt      :: Optional[TimeDelta] -> BaseAttempt
-    * max_attempts :: Getter () -> Optional[Integer] / Setter Integer -> None
-    * status       :: Getter () -> BaseJobStatus
-    * metadata     :: Getter () -> Dict[String, String]
-    * set_metadata :: kwargs -> None
+    * __init__            :: Any x String x Optional[Identifier] x Boolean -> None
+    * __iadd__            :: DependentTask -> BaseJob
+    * attempt             :: Optional[TimeDelta] -> BaseAttempt
+    * max_attempts        :: Getter () -> Optional[Integer] / Setter Integer -> None
+    * status              :: Getter () -> BaseJobStatus
+    * client_metadata     :: Getter () -> Dict[String, String]
+    * set_client_metadata :: kwargs -> None
     """
     _client_id:str
     _job_id:T.Identifier
@@ -281,7 +309,7 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
         return self
 
     def __next__(self) -> BaseAttempt:
-        # The next pending task to attempt, regardless of time limit
+        # The next pending task to attempt, *regardless* of time limit
         return self.attempt()
 
     @property
@@ -315,11 +343,13 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     def status(self) -> BaseJobStatus:
         """ Get the current job status """
 
+    # TODO Make the client metadata interface nicer
+
     @property
     @abstractmethod
-    def metadata(self) -> T.Dict[str, str]:
+    def client_metadata(self) -> T.Dict[str, str]:
         """ Get the client metadata """
 
     @abstractmethod
-    def set_metadata(self, **metadata:str) -> None:
+    def set_client_metadata(self, **metadata:str) -> None:
         """ Set (insert/update) key-value client metadata """
