@@ -253,7 +253,7 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     Implementations required:
     * __init__     :: Any x String x Optional[Identifier] x Boolean -> None
     * __iadd__     :: DependentTask -> BaseJob
-    * __next__     :: () -> BaseAttempt
+    * attempt      :: Optional[TimeDelta] -> BaseAttempt
     * max_attempts :: Getter () -> Optional[Integer] / Setter Integer -> None
     * status       :: Getter () -> BaseJobStatus
     * metadata     :: Getter () -> Dict[String, String]
@@ -280,13 +280,25 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     def __iter__(self) -> BaseJob:
         return self
 
-    @abstractmethod
     def __next__(self) -> BaseAttempt:
-        """ Fetch the next pending permissible task to attempt """
+        # The next pending task to attempt, regardless of time limit
+        return self.attempt()
 
     @property
     def job_id(self) -> T.Identifier:
         return self._job_id
+
+    @abstractmethod
+    def attempt(self, time_limit:T.Optional[T.TimeDelta] = None) -> BaseAttempt:
+        """
+        Fetch the next pending task to attempt, given the optional time
+        limit (which is ignored, if no timing statistics are available)
+
+        @param   time_limit  Only fetch attempts that are predicted to
+                             complete within this duration (optional;
+                             defaults to None, to ignore time limits)
+        @return  Attempt
+        """
 
     @property
     @abstractmethod
