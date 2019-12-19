@@ -129,7 +129,7 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
 
         @param   source            Source filesystem
         @param   target            Target filesystem
-        @raise   NoThroughputData  No throughtput data available
+        @raise   NoThroughputData  No throughput data available
         @return  Job throughput
         """
 
