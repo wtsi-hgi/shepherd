@@ -223,7 +223,7 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                         raise _VerificationFailure()
 
                     # TODO Different/multiple checksum algorithms
-                    target_checksum = self.checksum(target, "md5")
+                    target_checksum = self.checksum(DataOrigin.Target, "md5")
                     if source_checksum != target_checksum:
                         log(f"Attempt failed: "
                             f"Source has checksum {source_checksum}, "
