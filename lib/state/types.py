@@ -223,13 +223,13 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
             log(f"Attempting transfer of {task.source.address} from {task.source.filesystem} "
                 f"to {task.target.filesystem} at {task.target.address}", Level.Info)
 
-            # TODO Different/multiple checksum algorithms
-            executor = ThreadPoolExecutor(max_workers=1)
-            properties = executor.submit(self._get_source_properties, "md5")
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                # TODO Different/multiple checksum algorithms
+                properties = executor.submit(self._get_source_properties, "md5")
 
-            # Run task and join on properties thread results
-            self.exit_code = success = self.task()
-            source_size, source_checksums = properties.result()
+                # Run task in main tread and join on properties thread
+                self.exit_code = success = self.task()
+                source_size, source_checksums = properties.result()
 
             if not success:
                 log(f"Attempt failed with exit code {success.exit_code}", Level.Warning)
