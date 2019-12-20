@@ -20,6 +20,11 @@ with this program. If not, see https://www.gnu.org/licenses/
 begin transaction;
 
 
+-------------------------------------------------
+-- NOTE This schema script MUST be idempotent! --
+-------------------------------------------------
+
+
 -- Schema versioning
 do $$ declare
   schema date := timestamp '2019-12-17';
