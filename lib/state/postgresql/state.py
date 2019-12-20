@@ -21,14 +21,22 @@ with this program. If not, see https://www.gnu.org/licenses/
 # https://docs.python.org/3/whatsnew/3.7.html#pep-563-postponed-evaluation-of-annotations
 from __future__ import annotations
 
+from pathlib import Path
+
+from psycopg2.errors import RaiseException
+
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
-from common.models.task import ExitCode, Task
+from common.logging import log, Level
 from common.models.filesystems.types import BaseFilesystem
-# from .db import SOMETHING
+from common.models.task import ExitCode, Task
+from .db import PostgreSQL
 from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
                     JobPhase, JobThroughput, DependentTask, DataOrigin
 from ..exceptions import *
+
+
+_SCHEMA = Path("lib/state/postgresql/schema.sql")
 
 
 class PGPhaseStatus(BasePhaseStatus):
@@ -70,8 +78,60 @@ class PGAttempt(BaseAttempt):
 
 
 class PGJob(BaseJob):
-    def __init__(self, state:T.Any, *, client_id:str, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
-        raise NOT_IMPLEMENTED
+    _state:PostgreSQL
+
+    def __init__(self, state:PostgreSQL, *, client_id:str, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
+        self._state = state
+        self._client_id = client_id
+
+        # Create schema (idempotent)
+        try:
+            state.execute_script(_SCHEMA)
+
+        except RaiseException as e:
+            raise BackendException(f"Could not create schema\n{e.pgerror}")
+
+        # Check previous job exists under the same client
+        if job_id is not None:
+            with state.cursor() as c:
+                c.execute("""
+                    select * from jobs where id = %s and client = %s;
+                """, (job_id, client_id))
+
+                if c.fetchone() is None:
+                    raise BackendException(f"Job {job_id} does not exist or was started with a different client")
+
+        # Reset previously running task status on resumption
+        if job_id is not None and force_restart:
+            if any(self.status.phase(phase) for phase in JobPhase):
+                raise DataNotReady(f"Cannot restart job {job_id}; still in progress")
+
+            with state.cursor() as c:
+                c.execute("""
+                    with previously_running as (
+                        select task,
+                               start
+                        from   task_status
+                        where  succeeded is null
+                    )
+                    update attempts
+                    set    finish    = now(),
+                           exit_code = 1
+                    where  (task, start) in (select task, start from previously_running);
+                """)
+
+        # Create new job
+        if job_id is None:
+            with state.cursor() as c:
+                c.execute("""
+                    insert into jobs (client, max_attempts)
+                              values (%s, 1)
+                           returning id;
+                """, (client_id,))
+
+                job_id = c.fetchone().id
+
+        self._job_id = job_id
 
     def __iadd__(self, task:DependentTask) -> PGJob:
         raise NOT_IMPLEMENTED
