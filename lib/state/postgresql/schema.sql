@@ -27,7 +27,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-12-17';
+  schema date := timestamp '2019-12-23';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -131,7 +131,9 @@ create table if not exists filesystems (
   max_concurrency
     integer
     not null
-    check (max_concurrency > 0)
+    check (max_concurrency > 0),
+
+  unique (job, name)
 );
 
 
