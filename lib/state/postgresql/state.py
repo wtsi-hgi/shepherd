@@ -48,8 +48,34 @@ class PGPhaseStatus(BasePhaseStatus):
 
 
 class PGJobStatus(BaseJobStatus):
+    _state:PostgreSQL
+    _job_id:T.Identifier
+
+    def __init__(self, state:PostgreSQL, job_id:T.Identifier) -> None:
+        self._state = state
+        self._job_id = job_id
+
     def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
-        raise NOT_IMPLEMENTED
+        with self._state.transaction() as c:
+            c.execute("""
+                select job_throughput.transfer_rate,
+                       job_throughput.failure_rate
+                from   job_throughput
+                join   filesystems as source_fs
+                on     source_fs.id = job_throughput.source
+                join   filesystems as target_fs
+                on     target_fs.id = job_throughput.target
+                where  job_throughput.job = %s
+                and    source_fs.name     = %s
+                and    target_fs.name     = %s;
+            """, (self._job_id, source.name, target.name))
+
+            # TODO Py3.8 walrus operator would be good here
+            rates = c.fetchone()
+            if rates is None:
+                raise NoThroughputData(f"Not enough data to calculate throughput rates for job {self._job_id}")
+
+        return JobThroughput(rates.transfer_rate, rates.failure_rate)
 
     def phase(self, phase:JobPhase) -> PGPhaseStatus:
         raise NOT_IMPLEMENTED
@@ -159,7 +185,7 @@ class PGJob(BaseJob):
 
     @property
     def status(self) -> PGJobStatus:
-        raise NOT_IMPLEMENTED
+        return PGJobStatus(self._state, self.job_id)
 
     @property
     def metadata(self) -> T.SimpleNamespace:
