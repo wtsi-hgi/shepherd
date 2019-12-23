@@ -347,9 +347,9 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def client_metadata(self) -> T.Dict[str, str]:
-        """ Get the client metadata """
+    def metadata(self) -> T.Dict[str, str]:
+        """ Get the job metadata """
 
     @abstractmethod
-    def set_client_metadata(self, **metadata:str) -> None:
-        """ Set (insert/update) key-value client metadata """
+    def set_metadata(self, **metadata:str) -> None:
+        """ Set (insert/update) key-value metadata """

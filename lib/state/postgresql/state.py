@@ -152,8 +152,20 @@ class PGJob(BaseJob):
         raise NOT_IMPLEMENTED
 
     @property
-    def client_metadata(self) -> T.Dict[str, str]:
-        raise NOT_IMPLEMENTED
+    def metadata(self) -> T.Dict[str, str]:
+        with self._state.transaction() as c:
+            c.execute("""
+                select key, value from job_metadata where job = %s;
+            """, (self._job_id,))
 
-    def set_client_metadata(self, **metadata:str) -> None:
-        raise NOT_IMPLEMENTED
+            return {k:v for k, v in c.fetchall() or {}}
+
+    def set_metadata(self, **metadata:str) -> None:
+        with self._state.transaction() as c:
+            for k, v in metadata.items():
+                c.execute("""
+                    insert into job_metadata (job, key, value)
+                                      values (%s, %s, %s)
+                                 on conflict (job, key)
+                               do update set value = excluded.value;
+                """, (self._job_id, k, v))
