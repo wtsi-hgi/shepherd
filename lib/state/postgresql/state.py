@@ -93,7 +93,7 @@ class PGJob(BaseJob):
 
         # Check previous job exists under the same client
         if job_id is not None:
-            with state.cursor() as c:
+            with state.transaction() as c:
                 c.execute("""
                     select * from jobs where id = %s and client = %s;
                 """, (job_id, client_id))
@@ -106,7 +106,7 @@ class PGJob(BaseJob):
             if any(self.status.phase(phase) for phase in JobPhase):
                 raise DataNotReady(f"Cannot restart job {job_id}; still in progress")
 
-            with state.cursor() as c:
+            with state.transaction() as c:
                 c.execute("""
                     with previously_running as (
                         select task,
@@ -122,7 +122,7 @@ class PGJob(BaseJob):
 
         # Create new job
         if job_id is None:
-            with state.cursor() as c:
+            with state.transaction() as c:
                 c.execute("""
                     insert into jobs (client, max_attempts)
                               values (%s, 1)
