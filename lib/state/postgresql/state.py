@@ -141,11 +141,21 @@ class PGJob(BaseJob):
 
     @property
     def max_attempts(self) -> int:
-        raise NOT_IMPLEMENTED
+        with self._state.transaction() as c:
+            c.execute("""
+                select max_attempts from jobs where id = %s;
+            """, (self.job_id,))
+
+            return c.fetchone().max_attempts
 
     @max_attempts.setter
     def max_attempts(self, value:int) -> None:
-        raise NOT_IMPLEMENTED
+        with self._state.transaction() as c:
+            c.execute("""
+                update jobs
+                set    max_attempts = %s
+                where  id           = %s;
+            """, (value, self.job_id))
 
     @property
     def status(self) -> PGJobStatus:
@@ -156,7 +166,7 @@ class PGJob(BaseJob):
         with self._state.transaction() as c:
             c.execute("""
                 select key, value from job_metadata where job = %s;
-            """, (self._job_id,))
+            """, (self.job_id,))
 
             return {k:v for k, v in c.fetchall() or {}}
 
@@ -168,4 +178,4 @@ class PGJob(BaseJob):
                                       values (%s, %s, %s)
                                  on conflict (job, key)
                                do update set value = excluded.value;
-                """, (self._job_id, k, v))
+                """, (self.job_id, k, v))
