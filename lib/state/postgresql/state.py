@@ -82,9 +82,9 @@ class PGPhaseStatus(BasePhaseStatus):
             # the constructor, so an update will always be possible
             c.execute("""
                 update    job_timestamps
-                set       finish = least(finish, now())
-                where     job   = %s
-                and       phase = %s
+                set       finish = coalesce(finish, now())
+                where     job    = %s
+                and       phase  = %s
                 returning finish;
             """, (self._job_id, self._phase))
 
