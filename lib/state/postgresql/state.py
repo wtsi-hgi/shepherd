@@ -162,13 +162,13 @@ class PGJob(BaseJob):
         raise NOT_IMPLEMENTED
 
     @property
-    def metadata(self) -> T.Dict[str, str]:
+    def metadata(self) -> T.SimpleNamespace:
         with self._state.transaction() as c:
             c.execute("""
                 select key, value from job_metadata where job = %s;
             """, (self.job_id,))
 
-            return {k:v for k, v in c.fetchall() or {}}
+            return T.SimpleNamespace(**{k:v for k, v in c.fetchall() or {}})
 
     def set_metadata(self, **metadata:str) -> None:
         with self._state.transaction() as c:

@@ -347,7 +347,7 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def metadata(self) -> T.Dict[str, str]:
+    def metadata(self) -> T.SimpleNamespace:
         """ Get the job metadata """
 
     @abstractmethod
