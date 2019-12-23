@@ -39,12 +39,58 @@ from ..exceptions import *
 _SCHEMA = Path("lib/state/postgresql/schema.sql")
 
 
+# Map our Python JobPhase enum to our PostgreSQL job_phase enum
+_PG_PHASE_ENUM = {
+    JobPhase.Preparation: "prepare",
+    JobPhase.Transfer:    "transfer"
+}
+
 class PGPhaseStatus(BasePhaseStatus):
+    _state:PostgreSQL
+    _job_id:T.Identifier
+    _phase:str
+
+    def __init__(self, state:PostgreSQL, job_id:T.Identifier, phase:JobPhase) -> None:
+        self._state = state
+        self._job_id = job_id
+        self._phase = _PG_PHASE_ENUM[phase]
+
+        self.init()
+
     def init(self) -> T.DateTime:
-        raise NOT_IMPLEMENTED
+        # Set the start time, if it hasn't been already, and return it
+        with self._state.transaction() as c:
+            # NOTE In the below, the returning clause will only return
+            # if a change was made, thus we forcibly make a redundant
+            # change (rather than "do nothing") on conflicts
+            c.execute("""
+                insert into job_timestamps (job, phase)
+                                    values (%s, %s)
+                               on conflict (job, phase)
+                             do update set phase = excluded.phase
+                                 returning start;
+            """, (self._job_id, self._phase))
+
+            self.start = c.fetchone().start
+
+        return self.start
 
     def stop(self) -> T.DateTime:
-        raise NOT_IMPLEMENTED
+        # Set the finish time, if it hasn't been already, and return it;
+        with self._state.transaction() as c:
+            # NOTE The start time is recorded, if necessary, as part of
+            # the constructor, so an update will always be possible
+            c.execute("""
+                update    job_timestamps
+                set       finish = least(finish, now())
+                where     job   = %s
+                and       phase = %s
+                returning finish;
+            """, (self._job_id, self._phase))
+
+            self.finish = c.fetchone().finish
+
+        return self.finish
 
 
 class PGJobStatus(BaseJobStatus):
@@ -78,7 +124,7 @@ class PGJobStatus(BaseJobStatus):
         return JobThroughput(rates.transfer_rate, rates.failure_rate)
 
     def phase(self, phase:JobPhase) -> PGPhaseStatus:
-        raise NOT_IMPLEMENTED
+        return PGPhaseStatus(self._state, self._job_id, phase)
 
 
 class PGAttempt(BaseAttempt):
