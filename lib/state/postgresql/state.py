@@ -223,7 +223,7 @@ class PGJob(BaseJob):
 
         self._job_id = job_id
 
-    def _add_data(self, c:cursor, data:Data) -> T.Identifier:
+    def _add_data(self, c:cursor, data:Data, persist_size:bool = False) -> T.Identifier:
         # Add data record (filesystem and address) to database
 
         # NOTE In the below, the returning clause will only return if a
@@ -245,7 +245,14 @@ class PGJob(BaseJob):
                    returning id;
         """, (filesystem_id, str(data.address)))
 
-        return c.fetchone().id
+        data_id = c.fetchone().id
+
+        if persist_size:
+            # The root source data size should be persisted
+            filesize = data.filesystem.size(data.address)
+            c.execute("insert into size (data, size) values (%s, %s);", (data_id, filesize))
+
+        return data_id
 
     @staticmethod
     def _get_target_id(c:cursor, task_id:T.Identifier) -> T.Identifier:
@@ -270,7 +277,7 @@ class PGJob(BaseJob):
                 # dependency, if it has one, so only add data records to
                 # the database when we need to; otherwise we'd trip over
                 # the uniqueness constraint set by the schema
-                "source_id":     self._add_data(c, task.task.source) if root_task else \
+                "source_id":     self._add_data(c, task.task.source, True) if root_task else \
                                  PGJob._get_target_id(c, dependency),
                 "target_id":     self._add_data(c, task.task.target),
 
