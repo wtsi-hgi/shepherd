@@ -101,7 +101,6 @@ class BasePhaseStatus(_BaseDurationMixin, metaclass=ABCMeta):
         return self.finish is None
 
 
-@dataclass(frozen=True)
 class _TaskOverviewMixin:
     """ Model for expressing job task overview """
     pending:int
