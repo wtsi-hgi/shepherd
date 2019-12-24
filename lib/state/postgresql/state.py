@@ -208,6 +208,10 @@ class PGJob(BaseJob):
 
     def _add_data(self, c:cursor, data:Data) -> T.Identifier:
         # Add data record (filesystem and address) to database
+
+        # NOTE In the below, the returning clause will only return if a
+        # change was made, thus we forcibly make a redundant change
+        # (rather than "do nothing") on conflicts
         c.execute("""
             insert into filesystems (job, name, max_concurrency)
                              values (%s, %s, %s)
