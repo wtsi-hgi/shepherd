@@ -24,12 +24,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from psycopg2.errors import RaiseException
+from psycopg2.extensions import cursor
 
 from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from common.logging import log, Level
-from common.models.filesystems.types import BaseFilesystem
-from common.models.task import ExitCode, Task
+from common.models.filesystems.types import BaseFilesystem, Data
+from common.models.task import ExitCode
 from .db import PostgreSQL
 from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
                     JobPhase, JobThroughput, DependentTask, DataOrigin
@@ -205,8 +206,68 @@ class PGJob(BaseJob):
 
         self._job_id = job_id
 
+    def _add_data(self, c:cursor, data:Data) -> T.Identifier:
+        # Add data record (filesystem and address) to database
+        c.execute("""
+            insert into filesystems (job, name, max_concurrency)
+                             values (%s, %s, %s)
+                        on conflict (job, name)
+                      do update set name = excluded.name
+                          returning id;
+        """, (self._job_id, data.filesystem.name, data.filesystem.max_concurrency))
+
+        filesystem_id = c.fetchone().id
+
+        c.execute("""
+            insert into data (filesystem, address)
+                      values (%s, %s)
+                   returning id;
+        """, (filesystem_id, str(data.address)))
+
+        return c.fetchone().id
+
+    @staticmethod
+    def _get_target_id(c:cursor, task_id:T.Identifier) -> T.Identifier:
+        # Get the target data identifier for a task
+        c.execute("select target from tasks where id = %s;", (task_id,))
+        return c.fetchone().target
+
+    def _add_task_tree(self, task:T.Optional[DependentTask]) -> T.Optional[T.Identifier]:
+        if task is None:
+            return None
+
+        # Recursively add dependencies until we bottom out (i.e., above)
+        dependency = self._add_task_tree(task.dependency)
+        root_task = dependency is None
+
+        # Add task
+        with self._state.transaction() as c:
+            task_values = {
+                "job_id":        self.job_id,
+
+                # The source of a task is the same as the target of its
+                # dependency, if it has one, so only add data records to
+                # the database when we need to; otherwise we'd trip over
+                # the uniqueness constraint set by the schema
+                "source_id":     self._add_data(c, task.task.source) if root_task else \
+                                 PGJob._get_target_id(c, dependency),
+                "target_id":     self._add_data(c, task.task.target),
+
+                "script":        task.task.script,
+                "dependency_id": dependency
+            }
+
+            c.execute("""
+                insert into tasks (job, source, target, script, dependency)
+                           values (%(job_id)s, %(source_id)s, %(target_id)s, %(script)s, %(dependency_id)s)
+                        returning id;
+            """, task_values)
+
+            return c.fetchone().id
+
     def __iadd__(self, task:DependentTask) -> PGJob:
-        raise NOT_IMPLEMENTED
+        _ = self._add_task_tree(task)
+        return self
 
     def attempt(self, time_limit:T.Optional[T.TimeDelta] = None) -> PGAttempt:
         raise NOT_IMPLEMENTED
