@@ -102,6 +102,23 @@ class PGJobStatus(BaseJobStatus):
         self._state = state
         self._job_id = job_id
 
+        with state.transaction() as c:
+            c.execute("""
+                select   sum(pending)   as pending,
+                         sum(running)   as running,
+                         sum(failed)    as failed,
+                         sum(succeeded) as succeeded
+                from     job_status
+                where    job = %s
+                group by job;
+            """, (job_id,))
+
+            status = c.fetchone()
+            self.pending   = status.pending
+            self.running   = status.running
+            self.failed    = status.failed
+            self.succeeded = status.succeeded
+
     def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
         with self._state.transaction() as c:
             c.execute("""

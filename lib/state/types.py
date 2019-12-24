@@ -279,13 +279,13 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     Abstract base class for jobs
 
     Implementations required:
-    * __init__            :: Any x String x Optional[Identifier] x Boolean -> None
-    * __iadd__            :: DependentTask -> BaseJob
-    * attempt             :: Optional[TimeDelta] -> BaseAttempt
-    * max_attempts        :: Getter () -> Optional[Integer] / Setter Integer -> None
-    * status              :: Getter () -> BaseJobStatus
-    * client_metadata     :: Getter () -> Dict[String, String]
-    * set_client_metadata :: kwargs -> None
+    * __init__     :: Any x String x Optional[Identifier] x Boolean -> None
+    * __iadd__     :: DependentTask -> BaseJob
+    * attempt      :: Optional[TimeDelta] -> BaseAttempt
+    * max_attempts :: Getter () -> Optional[Integer] / Setter Integer -> None
+    * status       :: Getter () -> BaseJobStatus
+    * metadata     :: Getter () -> SimpleNamespace
+    * set_metadata :: kwargs -> None
     """
     _client_id:str
     _job_id:T.Identifier
