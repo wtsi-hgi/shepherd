@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from psycopg2.errors import RaiseException
 from psycopg2.extensions import cursor
 
 from common import types as T
@@ -178,10 +177,9 @@ class PGJob(BaseJob):
         try:
             state.execute_script(_SCHEMA)
 
-        # FIXME The above should really raise a sub-exception of
-        # BackendException, rather than relying on psycopg2
-        except RaiseException as e:
-            raise BackendException(f"Could not create schema\n{e.pgerror}")
+        except LogicException as e:
+            message = f"Could not create schema\n{e}"
+            raise LogicException(message)
 
         # Check previous job exists under the same client
         if job_id is not None:

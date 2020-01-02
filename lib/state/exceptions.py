@@ -25,6 +25,8 @@ with this program. If not, see https://www.gnu.org/licenses/
 #       |
 #       +-- BackendException
 #       |    |
+#       |    +-- LogicException
+#       |    |
 #       |    +-- NoFilesystemConvertor
 #       |
 #       +-- DataException
@@ -44,6 +46,9 @@ class StateException(Exception):
 
 class BackendException(StateException):
     """ Base engine exception """
+
+class LogicException(BackendException):
+    """ Raised when the backend raises a logic error (as opposed to a data error) """
 
 class NoFilesystemConvertor(BackendException):
     """ Raised when data cannot be mapped to a filesystem instance """
