@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+# TODO This is here for the type annotation, but we ought to decouple
 from psycopg2.extensions import cursor
 
 from common import types as T
