@@ -52,10 +52,13 @@ class PGPhaseStatus(BasePhaseStatus):
     _phase:str
 
     def __init__(self, state:PostgreSQL, job_id:T.Identifier, phase:JobPhase) -> None:
-        self._state = state
+        self._state  = state
         self._job_id = job_id
-        self._phase = _PG_PHASE_ENUM[phase]
+        self._phase  = _PG_PHASE_ENUM[phase]
 
+        # TODO/FIXME Do we always want to initialise the phase, if
+        # necessary, on construction? What if we want to check if the
+        # phase has started already; we couldn't do that in this case?
         self.init()
 
     def init(self) -> T.DateTime:
