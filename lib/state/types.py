@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 Genome Research Limited
+Copyright (c) 2019, 2020 Genome Research Limited
 
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
@@ -31,6 +31,43 @@ from common.logging import log, Level
 from common.models.task import ExitCode, Task
 from common.models.filesystems.types import BaseFilesystem
 from .exceptions import NoCommonChecksumAlgorithm, PhaseNotStarted
+
+
+class BaseStateProtocol(metaclass=ABCMeta):
+    """
+    Abstract base class for encapsulating communication with the
+    underlying persistence engine (e.g., managing connections,
+    performing queries, etc.) and application-level classes
+
+    NOTE Must be thread-safe
+
+    Implementations required:
+    * filesystem_convertor :: *args x **kwargs -> BaseFilesystem
+    """
+    _filesystems:T.Dict[str, BaseFilesystem]
+
+    def register_filesystems(self, *filesystems:BaseFilesystem) -> None:
+        # Add filesystem instances to our internal mapping
+        if not hasattr(self, "_filesystems"):
+            self._filesystems = {}
+
+        self._filesystems = {
+            **self._filesystems,
+            **{fs.name: fs for fs in filesystems}
+        }
+
+    @abstractmethod
+    def filesystem_convertor(self, *args, **kwargs) -> BaseFilesystem:
+        """
+        Convert a persisted representation of a filesystem into its
+        respective instance
+
+        @param   *args, **kwargs        Necessary data from the
+                                        persistence engine to map to the
+                                        appropriate filesystem instance
+        @raises  NoFilesystemConvertor  Ambiguous conversion
+        @return  Filesystem instance
+        """
 
 
 # Verification failure handling
@@ -290,11 +327,11 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     _job_id:T.Identifier
 
     @abstractmethod
-    def __init__(self, state:T.Any, *, client_id:str, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
+    def __init__(self, state:BaseStateProtocol, *, client_id:str, job_id:T.Optional[T.Identifier] = None, force_restart:bool = False) -> None:
         """
         Constructor
 
-        @param  state          Object that describes the persisted state
+        @param  state          Encapsulation of the persisted state
         @param  client_id      Client identifier
         @param  job_id         Job ID for a running job
         @param  force_restart  Whether to forcibly resume a job

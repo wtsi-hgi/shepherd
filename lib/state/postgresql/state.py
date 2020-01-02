@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 Genome Research Limited
+Copyright (c) 2019, 2020 Genome Research Limited
 
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
@@ -178,6 +178,8 @@ class PGJob(BaseJob):
         try:
             state.execute_script(_SCHEMA)
 
+        # FIXME The above should really raise a sub-exception of
+        # BackendException, rather than relying on psycopg2
         except RaiseException as e:
             raise BackendException(f"Could not create schema\n{e.pgerror}")
 

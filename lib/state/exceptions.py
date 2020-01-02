@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 Genome Research Limited
+Copyright (c) 2019, 2020 Genome Research Limited
 
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
@@ -24,6 +24,8 @@ with this program. If not, see https://www.gnu.org/licenses/
 #  +-- StateException
 #       |
 #       +-- BackendException
+#       |    |
+#       |    +-- NoFilesystemConvertor
 #       |
 #       +-- DataException
 #            |
@@ -42,6 +44,9 @@ class StateException(Exception):
 
 class BackendException(StateException):
     """ Base engine exception """
+
+class NoFilesystemConvertor(BackendException):
+    """ Raised when data cannot be mapped to a filesystem instance """
 
 class DataException(StateException):
     """ Base state exception """
