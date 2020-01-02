@@ -30,7 +30,7 @@ from common import types as T
 from common.exceptions import NOT_IMPLEMENTED
 from common.logging import log, Level
 from common.models.filesystems.types import BaseFilesystem, Data
-from common.models.task import ExitCode
+from common.models.task import ExitCode, Task
 from .db import PostgreSQL
 from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
                     JobPhase, JobThroughput, DependentTask, DataOrigin
@@ -56,34 +56,47 @@ class PGPhaseStatus(BasePhaseStatus):
         self._job_id = job_id
         self._phase  = _PG_PHASE_ENUM[phase]
 
-        # TODO/FIXME Do we always want to initialise the phase, if
-        # necessary, on construction? What if we want to check if the
-        # phase has started already; we couldn't do that in this case?
-        self.init()
+        # Initialise timestamps
+        self.start = self.finish = None
+
+        # Set timestamps from database, if available
+        with state.transaction() as c:
+            c.execute("""
+                select start,
+                       finish
+                from   job_timestamps
+                where  job   = %s
+                and    phase = %s;
+            """, (job_id, self._phase))
+
+            # TODO Py3.8 walrus operator would be good here
+            timestamps = c.fetchone()
+            if timestamps is not None:
+                self.start  = timestamps.start
+                self.finish = timestamps.finish
 
     def init(self) -> T.DateTime:
         # Set the start time, if it hasn't been already, and return it
-        with self._state.transaction() as c:
-            # NOTE In the below, the returning clause will only return
-            # if a change was made, thus we forcibly make a redundant
-            # change (rather than "do nothing") on conflicts
-            c.execute("""
-                insert into job_timestamps (job, phase)
-                                    values (%s, %s)
-                               on conflict (job, phase)
-                             do update set phase = excluded.phase
-                                 returning start;
-            """, (self._job_id, self._phase))
+        if self.start is None:
+            with self._state.transaction() as c:
+                c.execute("""
+                    insert into job_timestamps (job, phase)
+                                        values (%s, %s)
+                                     returning start;
+                """, (self._job_id, self._phase))
 
-            self.start = c.fetchone().start
+                self.start = c.fetchone().start
 
         return self.start
 
     def stop(self) -> T.DateTime:
-        # Set the finish time, if it hasn't been already, and return it;
+        # Set the finish time, if it hasn't been already, and return it
+        if self.start is None:
+            raise PeriodNotStarted(f"{self._phase.capitalize()} phase has yet to start")
+
         with self._state.transaction() as c:
-            # NOTE The start time is recorded, if necessary, as part of
-            # the constructor, so an update will always be possible
+            # NOTE The start time must have been recorded, at this
+            # point, so an update will always be possible
             c.execute("""
                 update    job_timestamps
                 set       finish = coalesce(finish, now())
@@ -149,6 +162,9 @@ class PGJobStatus(BaseJobStatus):
 
 
 class PGAttempt(BaseAttempt):
+    def __init__(self, task:Task) -> None:
+        self.task = task
+
     def init(self) -> T.DateTime:
         raise NOT_IMPLEMENTED
 

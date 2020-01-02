@@ -30,7 +30,7 @@ from common import types as T, time
 from common.logging import log, Level
 from common.models.task import ExitCode, Task
 from common.models.filesystems.types import BaseFilesystem
-from .exceptions import NoCommonChecksumAlgorithm, PhaseNotStarted
+from .exceptions import NoCommonChecksumAlgorithm, PeriodNotStarted
 
 
 class BaseStateProtocol(metaclass=ABCMeta):
@@ -81,14 +81,22 @@ class _VerificationFailure(Exception):
 @dataclass
 class _DurationMixin:
     """ Model for durations """
-    start:T.DateTime
+    start:T.Optional[T.DateTime]
     finish:T.Optional[T.DateTime]
 
     @property
     def runtime(self) -> T.TimeDelta:
         """ Phase runtime """
+        if self.start is None:
+            raise PeriodNotStarted("Period has yet to start")
+
         until = self.finish or time.now()
         return until - self.start
+
+    @property
+    def complete(self) -> bool:
+        # Truthy once there's a finish timestamp
+        return self.finish is not None
 
 class _BaseDurationMixin(_DurationMixin, metaclass=ABCMeta):
     """
@@ -134,8 +142,7 @@ _TRANSFER    = JobPhase.Transfer
 class BasePhaseStatus(_BaseDurationMixin, metaclass=ABCMeta):
     """ Abstract base class for phase status """
     def __bool__(self) -> bool:
-        # Truthy while there's no finish timestamp (i.e., in progress)
-        return self.finish is None
+        return not self.complete
 
 
 class _TaskOverviewMixin:
@@ -174,8 +181,8 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
         """
         Return the phase status for the specified phase
 
-        @param   phase            Job phase
-        @raise   PhaseNotStarted  Phase has yet to start
+        @param   phase             Job phase
+        @raise   PeriodNotStarted  Phase has yet to start
         @return  Phase status
         """
 
@@ -187,7 +194,7 @@ class BaseJobStatus(_TaskOverviewMixin, metaclass=ABCMeta):
         try:
             return not self.phase(_TRANSFER)
 
-        except PhaseNotStarted:
+        except PeriodNotStarted:
             return False
 
 

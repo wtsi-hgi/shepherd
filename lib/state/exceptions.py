@@ -33,7 +33,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 #            |
 #            +-- DataNotReady
 #            |    |
-#            |    +-- PhaseNotStarted
+#            |    +-- PeriodNotStarted
 #            |    |
 #            |    +-- NoThroughputData
 #            |
@@ -59,8 +59,8 @@ class DataException(StateException):
 class DataNotReady(DataException):
     """ Raised when data is not yet available """
 
-class PhaseNotStarted(DataNotReady):
-    """ Raised when a phase is queried but hasn't started """
+class PeriodNotStarted(DataNotReady):
+    """ Raised when a temporal period is queried but hasn't started """
 
 class NoThroughputData(DataNotReady):
     """ Raised when no relevant throughput data is available """
