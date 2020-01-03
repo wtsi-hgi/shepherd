@@ -27,7 +27,6 @@ from pathlib import Path
 from psycopg2.extensions import cursor
 
 from common import types as T
-from common.exceptions import NOT_IMPLEMENTED
 from common.logging import log, Level
 from common.models.filesystems.types import BaseFilesystem, Data
 from common.models.task import ExitCode, Task
@@ -116,7 +115,7 @@ class PGJobStatus(BaseJobStatus):
     _job_id:T.Identifier
 
     def __init__(self, state:PostgreSQL, job_id:T.Identifier) -> None:
-        self._state = state
+        self._state  = state
         self._job_id = job_id
 
         with state.transaction() as c:
@@ -163,9 +162,53 @@ class PGJobStatus(BaseJobStatus):
 
 
 class PGAttempt(BaseAttempt):
+    _state:PostgreSQL
+    _attempt_id:T.Identifier
+
     def __init__(self, state:PostgreSQL, attempt_id:T.Identifier) -> None:
-        # TODO Construct task instance from persisted data
-        pass
+        self._state      = state
+        self._attempt_id = attempt_id
+        self.start = self.finish = None
+
+        # Reconstruct task from persisted data
+        with state.transaction() as c:
+            c.execute("""
+                select tasks.script,
+                       source_fs.name as source_fs,
+                       source.address as source,
+                       target_fs.name as target_fs,
+                       target.address as target
+
+                from   attempts
+                join   tasks
+                on     tasks.id = attempts.task
+
+                join   data as source
+                on     source.id = tasks.source
+                join   filesystems as source_fs
+                on     source_fs.id = source.filesystem
+
+                join   data as target
+                on     target.id = tasks.target
+                join   filesystems as target_fs
+                on     target_fs.id = target.filesystem
+
+                where  attempts.id = %s
+            """, (attempt_id,))
+
+            task = c.fetchone()
+
+        self.task = Task(
+            script = task.script,
+            source = Data(
+                filesystem = state.filesystem_convertor(task.source_fs),
+                address    = task.source
+            ),
+            target = Data(
+                filesystem = state.filesystem_convertor(task.target_fs),
+                address    = task.target
+            )
+        )
 
     def init(self) -> T.DateTime:
         raise NOT_IMPLEMENTED
