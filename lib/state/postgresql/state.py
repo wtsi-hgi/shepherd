@@ -164,6 +164,8 @@ class PGJobStatus(BaseJobStatus):
 class PGAttempt(BaseAttempt):
     _state:PostgreSQL
     _attempt_id:T.Identifier
+    _source_id:T.Identifier
+    _target_id:T.Identifier
 
     def __init__(self, state:PostgreSQL, attempt_id:T.Identifier) -> None:
         self._state      = state
@@ -174,8 +176,10 @@ class PGAttempt(BaseAttempt):
         with state.transaction() as c:
             c.execute("""
                 select tasks.script,
+                       source.id      as source_id
                        source_fs.name as source_fs,
                        source.address as source,
+                       target.id      as target_id,
                        target_fs.name as target_fs,
                        target.address as target
 
@@ -193,7 +197,7 @@ class PGAttempt(BaseAttempt):
                 join   filesystems as target_fs
                 on     target_fs.id = target.filesystem
 
-                where  attempts.id = %s
+                where  attempts.id = %s;
             """, (attempt_id,))
 
             task = c.fetchone()
@@ -209,6 +213,9 @@ class PGAttempt(BaseAttempt):
                 address    = task.target
             )
         )
+
+        self._source_id = task.source_id
+        self._target_id = task.target_id
 
     def init(self) -> T.DateTime:
         raise NOT_IMPLEMENTED
