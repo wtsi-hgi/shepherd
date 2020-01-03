@@ -30,7 +30,7 @@ from common import types as T, time
 from common.logging import log, Level
 from common.models.task import ExitCode, Task
 from common.models.filesystems.types import BaseFilesystem
-from .exceptions import NoCommonChecksumAlgorithm, PeriodNotStarted
+from .exceptions import NoCommonChecksumAlgorithm, PeriodNotStarted, NoTasksAvailable
 
 
 class BaseStateProtocol(metaclass=ABCMeta):
@@ -355,7 +355,12 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
 
     def __next__(self) -> BaseAttempt:
         # The next pending task to attempt, *regardless* of time limit
-        return self.attempt()
+        try:
+            return self.attempt()
+
+        except NoTasksAvailable:
+            if self.status.complete:
+                raise StopIteration()
 
     @property
     def job_id(self) -> T.Identifier:

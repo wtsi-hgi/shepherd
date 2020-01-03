@@ -163,8 +163,9 @@ class PGJobStatus(BaseJobStatus):
 
 
 class PGAttempt(BaseAttempt):
-    def __init__(self, task:Task) -> None:
-        self.task = task
+    def __init__(self, state:PostgreSQL, attempt_id:T.Identifier) -> None:
+        # TODO Construct task instance from persisted data
+        pass
 
     def init(self) -> T.DateTime:
         raise NOT_IMPLEMENTED
@@ -323,7 +324,45 @@ class PGJob(BaseJob):
         return self
 
     def attempt(self, time_limit:T.Optional[T.TimeDelta] = None) -> PGAttempt:
-        raise NOT_IMPLEMENTED
+        with self._state.transaction() as c:
+            with c.lock("attempts"):
+                if time_limit is None:
+                    query = """
+                        select task
+                        from   todo
+                        where  job = %s
+                        limit  1;
+                    """
+                    params = (self.job_id,)
+
+                else:
+                    query = """
+                        select  task
+                        from    todo
+                        where   job = %s
+                        and    (eta is null
+                        or      eta <= %s)
+                        limit   1;
+                    """
+                    params = (self.job_id, time_limit)
+
+                c.execute(query, params)
+
+                # TODO Py3.8 walrus operator would be good here
+                todo = c.fetchone()
+                if todo is None:
+                    raise NoTasksAvailable("No tasks are currently available to attempt")
+
+                # Create sentinel attempt record
+                c.execute("""
+                    insert into attempts (task)
+                                  values (%s)
+                               returning id;
+                """, (todo.task,))
+
+                attempt_id = c.fetchone().id
+
+        return PGAttempt(self._state, attempt_id)
 
     @property
     def max_attempts(self) -> int:

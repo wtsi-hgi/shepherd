@@ -36,6 +36,8 @@ with this program. If not, see https://www.gnu.org/licenses/
 #            |    +-- PeriodNotStarted
 #            |    |
 #            |    +-- NoThroughputData
+#            |    |
+#            |    +-- NoTasksAvailable
 #            |
 #            +-- WorkerRedundant
 #            |
@@ -64,6 +66,9 @@ class PeriodNotStarted(DataNotReady):
 
 class NoThroughputData(DataNotReady):
     """ Raised when no relevant throughput data is available """
+
+class NoTasksAvailable(DataNotReady):
+    """ Raised when no tasks are currently available to attempt """
 
 class WorkerRedundant(DataException):
     """ Raised when a worker has nothing to do """
