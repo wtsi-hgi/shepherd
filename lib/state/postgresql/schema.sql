@@ -253,6 +253,10 @@ create table if not exists tasks (
 );
 
 create table if not exists attempts (
+  id
+    serial
+    primary key,
+
   task
     integer
     not null
@@ -274,7 +278,7 @@ create table if not exists attempts (
     integer
     default null,
 
-  primary key (task, start)
+  unique (task, start)
 );
 
 create index if not exists attempts_task      on attempts(task);

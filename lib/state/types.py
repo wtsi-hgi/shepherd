@@ -70,6 +70,8 @@ class BaseStateProtocol(metaclass=ABCMeta):
         """
 
 
+FORCIBLY_TERMINATED  = ExitCode(-3)
+
 # Verification failure handling
 _MISMATCHED_SIZE     = ExitCode(-1)
 _MISMATCHED_CHECKSUM = ExitCode(-2)

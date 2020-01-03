@@ -33,7 +33,8 @@ from common.models.filesystems.types import BaseFilesystem, Data
 from common.models.task import ExitCode, Task
 from .db import PostgreSQL
 from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
-                    JobPhase, JobThroughput, DependentTask, DataOrigin
+                    JobPhase, JobThroughput, DependentTask, DataOrigin, \
+                    FORCIBLY_TERMINATED
 from ..exceptions import *
 
 
@@ -219,16 +220,16 @@ class PGJob(BaseJob):
             with state.transaction() as c:
                 c.execute("""
                     with previously_running as (
-                        select task,
-                               start
+                        select id
                         from   task_status
                         where  succeeded is null
                     )
                     update attempts
-                    set    finish    = now(),
-                           exit_code = 1
-                    where  (task, start) in (select task, start from previously_running);
-                """)
+                    set    start     = coalesce(start, now()),
+                           finish    = now(),
+                           exit_code = %s
+                    where  id in (select id from previously_running);
+                """, (FORCIBLY_TERMINATED.exit_code,))
 
         # Create new job
         if job_id is None:
