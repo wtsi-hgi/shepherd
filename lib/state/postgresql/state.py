@@ -164,8 +164,7 @@ class PGJobStatus(BaseJobStatus):
 class PGAttempt(BaseAttempt):
     _state:PostgreSQL
     _attempt_id:T.Identifier
-    _source_id:T.Identifier
-    _target_id:T.Identifier
+    _origin_id:T.Dict[DataOrigin, T.Tuple[T.Identifier, Data]]
 
     def __init__(self, state:PostgreSQL, attempt_id:T.Identifier) -> None:
         self._state      = state
@@ -214,28 +213,113 @@ class PGAttempt(BaseAttempt):
             )
         )
 
-        self._source_id = task.source_id
-        self._target_id = task.target_id
+        # Convenience alias for internal use
+        self._origin_id = {
+            DataOrigin.Source: (task.source_id, self.task.source),
+            DataOrigin.Target: (task.target_id, self.task.target)
+        }
 
     def init(self) -> T.DateTime:
-        raise NOT_IMPLEMENTED
+        # FIXME init and stop are very similar
+        with self._state.transaction() as c:
+            c.execute("""
+                update    attempts
+                set       start = coalesce(start, now())
+                where     id = %s
+                returning start;
+            """, (self._attempt_id,))
+
+            self.start = c.fetchone().start
+
+        return self.start
 
     def stop(self) -> T.DateTime:
-        raise NOT_IMPLEMENTED
+        # FIXME init and stop are very similar
+        with self._state.transaction() as c:
+            c.execute("""
+                update    attempts
+                set       finish = coalesce(finish, now())
+                where     id = %s
+                returning finish;
+            """, (self._attempt_id,))
+
+            self.finish = c.fetchone().finish
+
+        return self.finish
 
     def size(self, origin:DataOrigin) -> int:
-        raise NOT_IMPLEMENTED
+        # FIXME size and checksum are very similar
+        data_id, data = self._origin_id[origin]
+
+        with self._state.transaction() as c:
+            c.execute("""
+                select size
+                from   size
+                where  data = %s;
+            """, (data_id,))
+
+            # TODO Py3.8 walrus operator would be good here
+            record = c.fetchone()
+            if record is None:
+                c.execute("""
+                    insert into size (data, size)
+                              values (%s, %s)
+                           returning size;
+                """, (data_id, data.filesystem.size(data.address)))
+
+                record = c.fetchone()
+
+        return record.size
 
     def checksum(self, origin:DataOrigin, algorithm:str) -> str:
-        raise NOT_IMPLEMENTED
+        # FIXME size and checksum are very similar
+        data_id, data = self._origin_id[origin]
+
+        with self._state.transaction() as c:
+            c.execute("""
+                select checksum
+                from   checksums
+                where  data      = %s
+                and    algorithm = %s;
+            """, (data_id, algorithm))
+
+            # TODO Py3.8 walrus operator would be good here
+            record = c.fetchone()
+            if record is None:
+                c.execute("""
+                    insert into checksums (data, algorithm, checksum)
+                                   values (%s, %s, %s)
+                                returning checksum;
+                """, (data_id, algorithm, data.filesystem.checksum(algorithm, data.address)))
+
+                record = c.fetchone()
+
+        return record.checksum
 
     @property
     def exit_code(self) -> ExitCode:
-        raise NOT_IMPLEMENTED
+        with self._state.transaction() as c:
+            c.execute("""
+                select exit_code
+                from   attempts
+                where  id = %s;
+            """, (self._attempt_id,))
+
+            # TODO Py3.8 walrus operator would be good here
+            exit_code = c.fetchone().exit_code
+            if exit_code is None:
+                raise DataNotReady("Attempt is still in progress")
+
+        return ExitCode(exit_code)
 
     @exit_code.setter
     def exit_code(self, value:ExitCode) -> None:
-        raise NOT_IMPLEMENTED
+        with self._state.transaction() as c:
+            c.execute("""
+                update attempts
+                set    exit_code = %s
+                where  id        = %s;
+            """, (value.exit_code, self._attempt_id))
 
 
 class PGJob(BaseJob):
