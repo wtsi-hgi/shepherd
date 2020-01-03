@@ -301,7 +301,7 @@ create or replace view task_status as
          attempts.exit_code = 0 as succeeded                               -- Success predicate (null => in progress)
   from   attempts
   window history as (partition by attempts.task
-                     order by     attempts.start asc nulls first)
+                     order by     attempts.start asc nulls last)
 
   union all
 
