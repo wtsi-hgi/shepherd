@@ -246,6 +246,8 @@ class PGJob(BaseJob):
 
     def _add_data(self, c:cursor, data:Data, persist_size:bool = False) -> T.Identifier:
         # Add data record (filesystem and address) to database
+        # FIXME Passing in the cursor here is to maintain the
+        # transaction; there's probably a nicer way to do this
 
         # NOTE In the below, the returning clause will only return if a
         # change was made, thus we forcibly make a redundant change
@@ -278,6 +280,8 @@ class PGJob(BaseJob):
     @staticmethod
     def _get_target_id(c:cursor, task_id:T.Identifier) -> T.Identifier:
         # Get the target data identifier for a task
+        # FIXME Passing in the cursor here is to maintain the
+        # transaction; there's probably a nicer way to do this
         c.execute("select target from tasks where id = %s;", (task_id,))
         return c.fetchone().target
 
