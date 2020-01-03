@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 Genome Research Limited
+Copyright (c) 2019, 2020 Genome Research Limited
 
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
@@ -27,7 +27,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2019-12-23';
+  schema date := timestamp '2020-01-03';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -261,8 +261,7 @@ create table if not exists attempts (
   -- Attempt start time
   start
     timestamp with time zone
-    not null
-    default now(),
+    default null,
 
   -- Attempt finish time (null for inflight)
   finish
@@ -298,7 +297,7 @@ create or replace view task_status as
          attempts.exit_code = 0 as succeeded                               -- Success predicate (null => in progress)
   from   attempts
   window history as (partition by attempts.task
-                     order by     attempts.start asc)
+                     order by     attempts.start asc nulls first)
 
   union all
 
