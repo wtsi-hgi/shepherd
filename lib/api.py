@@ -24,7 +24,6 @@ from common.models.api import API, RequiredArgument, OptionalArgument
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
 from lib.execution.lsf import LSF
 from lib.planning import transformers as transformer
-from lib.state.native import NativeJob
 
 
 # NOTE The API class is a Callable and used to wrap callables, such as
@@ -33,20 +32,11 @@ from lib.state.native import NativeJob
 # the callable directly (i.e., rather than calling it), then use its
 # callable attribute.
 
+# FIXME I'm not convinced that this is a good idea...marking as
+# DEPRECATED for now
+
 
 _Registrations = T.Dict[str, API]
-
-state:_Registrations = {
-    "native": API(
-        callable=NativeJob,
-        arguments=[
-            RequiredArgument("state", T.Path, help="Directory to contain state"),
-            OptionalArgument("job_id", int, public=False),
-            OptionalArgument("force_restart", bool, public=False, default=False)
-        ],
-        help="SQLite-based state engine"
-    )
-}
 
 filesystems:_Registrations = {
     "POSIXFilesystem": API(
