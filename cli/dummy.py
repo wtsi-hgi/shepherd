@@ -30,7 +30,7 @@ from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.planning.route_factories import posix_to_irods_factory
 from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
 from lib.state import postgresql as State
-from lib.state.exceptions import DataException
+from lib.state.exceptions import DataException, NoThroughputData
 from lib.state.types import JobPhase, DependentTask
 
 
@@ -218,7 +218,29 @@ def transfer(job_id:str) -> None:
 
 
 def status(job_id:str) -> None:
-    ...
+    """ Report job status to user """
+    _LOG_HEADER()
+
+    state = _GET_STATE()
+    job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
+    current = job.status
+
+    if not current.phase(JobPhase.Preparation).complete:
+        raise DataException(f"Preparation phase for job {job_id} has yet to complete")
+
+    log.info(f"Pending: {current.pending}")
+    log.info(f"Running: {current.running}")
+    log.info(f"Failed: {current.failed}")
+    log.info(f"Succeeded: {current.succeeded}")
+
+    try:
+        throughput = current.throughput(*_FILESYSTEMS)
+        log.info(f"Transfer rate: {throughput.transfer_rate} b/s")
+        log.info(f"Failure rate: {throughput.failure_rate}")
+
+    except NoThroughputData:
+        log.info("Transfer rate: No data")
+        log.info("Failure rate: No data")
 
 
 # def run_state(state_root:str, job_id:str) -> None:
