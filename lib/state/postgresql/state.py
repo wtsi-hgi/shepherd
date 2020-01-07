@@ -27,7 +27,7 @@ from pathlib import Path
 from psycopg2.extensions import cursor
 
 from common import types as T
-from common.logging import log, Level
+from common.logging import log
 from common.models.filesystems.types import BaseFilesystem, Data
 from common.models.task import ExitCode, Task
 from .db import PostgreSQL

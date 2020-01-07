@@ -27,7 +27,7 @@ from enum import Enum, auto
 from concurrent.futures import ThreadPoolExecutor
 
 from common import types as T, time
-from common.logging import log, Level
+from common.logging import log
 from common.models.task import ExitCode, Task
 from common.models.filesystems.types import BaseFilesystem
 from .exceptions import NoCommonChecksumAlgorithm, PeriodNotStarted, NoTasksAvailable
@@ -265,8 +265,8 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
         # The context manager sets the attempt start and finish timestamps
         with self:
             task = self.task
-            log(f"Attempting transfer of {task.source.address} from {task.source.filesystem} "
-                f"to {task.target.filesystem} at {task.target.address}", Level.Info)
+            log.info(f"Attempting transfer of {task.source.address} from {task.source.filesystem} "
+                     f"to {task.target.filesystem} at {task.target.address}")
 
             with ThreadPoolExecutor(max_workers=1) as executor:
                 # TODO Different/multiple checksum algorithms
@@ -277,15 +277,15 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                 source_size, source_checksums = properties.result()
 
             if not success:
-                log(f"Attempt failed with exit code {success.exit_code}", Level.Warning)
+                log.warning(f"Attempt failed with exit code {success.exit_code}")
 
             else:
                 try:
                     target_size = self.size(_TARGET)
                     if source_size != target_size:
-                        log(f"Attempt failed: "
-                            f"Source is {source_size} bytes; "
-                            f"target is {target_size} bytes", Level.Warning)
+                        log.warning(f"Attempt failed: "
+                                    f"Source is {source_size} bytes; "
+                                    f"target is {target_size} bytes")
 
                         self.exit_code = success = _MISMATCHED_SIZE
                         raise _VerificationFailure()
@@ -294,9 +294,9 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                     source_checksum = source_checksums["md5"]
                     target_checksum = self.checksum(_TARGET, "md5")
                     if source_checksum != target_checksum:
-                        log(f"Attempt failed: "
-                            f"Source has checksum {source_checksum}; "
-                            f"target has checksum {target_checksum}", Level.Warning)
+                        log.warning(f"Attempt failed: "
+                                    f"Source has checksum {source_checksum}; "
+                                    f"target has checksum {target_checksum}")
 
                         self.exit_code = success = _MISMATCHED_CHECKSUM
                         raise _VerificationFailure()

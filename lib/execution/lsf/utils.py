@@ -21,7 +21,7 @@ import subprocess
 import shlex
 
 from common import types as T
-from common.logging import log, Level
+from common.logging import log
 from ..types import WorkerIdentifier
 
 
@@ -37,7 +37,7 @@ def lsf_job_id(identifier:WorkerIdentifier) -> str:
 
 def run(command:str, *, env:T.Optional[T.Dict[str, str]] = None) -> subprocess.CompletedProcess:
     """ Wrapper for running commands """
-    log(f"Running: {command}", Level.Debug)
+    log.debug(f"Running: {command}")
     return subprocess.run(
         shlex.split(command), env=env,
         capture_output=True, check=False, text=True)
