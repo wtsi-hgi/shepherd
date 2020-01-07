@@ -70,6 +70,7 @@ def main(*args:str) -> None:
         "PREP_QUEUE":     "LSF queue to use for the preparation phase",
         "TRANSFER_QUEUE": "LSF queue to use for the transfer phase"
         # "MAX_ATTEMPTS": "Maximum attempts per transfer task [3]"
+        # "SHEPHERD_LOG": "Logging directory [pwd]"
     }
 
     # Mode delegation routines
