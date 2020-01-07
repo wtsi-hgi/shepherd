@@ -24,33 +24,36 @@ from time import sleep
 from common import types as T
 from common.logging import log
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
-#from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
-#from lib.planning.route_factories import posix_to_irods_factory
-#from lib.state.types import JobStatus, DataNotReady, WorkerRedundant
 from lib import __version__ as lib_version
 from lib.execution import types as Exec
 from lib.execution.lsf import LSF, LSFSubmissionOptions
+from lib.planning.route_factories import posix_to_irods_factory
+from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
 from lib.state import postgresql as State
+from lib.state.exceptions import DataException
+from lib.state.types import JobPhase, DependentTask
 
 
 _CLIENT = "dummy"
 
 _BINARY = T.Path(sys.argv[0]).resolve()
 
-_FILESYSTEMS = [
+_FILESYSTEMS = (
     POSIXFilesystem(name="Lustre", max_concurrency=50),
     iRODSFilesystem(name="iRODS",  max_concurrency=10)
-]
+)
 
 # These are lambdas because we haven't, at this point, checked the
 # necessary environment variables are set
 _GET_EXECUTOR = lambda: LSF(T.Path(os.environ["LSF_CONFIG"]))
-_GET_STATE = lambda: state.PostgreSQL(
+_GET_STATE = lambda: State.PostgreSQL(
     database = os.environ["PG_DATABASE"],
     user     = os.environ["PG_USERNAME"],
     password = os.environ["PG_PASSWORD"],
     host     = os.environ["PG_HOST"],
     port     = int(os.getenv("PG_PORT", "5432")))
+
+_LOG_HEADER = lambda: log.info(f"Shepherd: {_CLIENT} / lib {lib_version}")
 
 
 def main(*args:str) -> None:
@@ -76,6 +79,7 @@ def main(*args:str) -> None:
     # Mode delegation routines
     delegate = {
         "submit":     submit,
+        "status":     status,
         "__prepare":  prepare,
         "__transfer": transfer
     }
@@ -105,7 +109,7 @@ def main(*args:str) -> None:
     delegate[mode](*mode_args)
 
 
-def submit(fofn:str, prefix:str) -> None:
+def submit(fofn:str, subcollection:str) -> None:
     """ Submit a FoFN job to the executioner """
     # Set logging directory, if not already
     if "SHEPHERD_LOG" not in os.environ:
@@ -116,14 +120,14 @@ def submit(fofn:str, prefix:str) -> None:
 
     fofn_path = T.Path(fofn).resolve()
 
-    log.info(f"Shepherd: {_CLIENT} / lib {lib_version}")
+    _LOG_HEADER()
     log.info(f"Logging to {log_dir}")
     log.info(f"Will transfer contents of {fofn_path}")
 
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT)
     job.max_attempts = max_attempts = int(os.getenv("MAX_ATTEMPTS", "3"))
-    job.set_metadata(fofn=str(fofn_path), prefix=prefix)
+    job.set_metadata(fofn=str(fofn_path), subcollection=subcollection)
 
     log.info(f"Created new job with ID {job.job_id}, with up to {max_attempts} attempts per task")
 
@@ -168,72 +172,55 @@ def submit(fofn:str, prefix:str) -> None:
     log.info(f"Transfer phase submitted with LSF ID {transfer_runner.job} and {len(transfer_runners)} workers")
 
 
-def prepare() -> None:
+def prepare(job_id:str) -> None:
+    """ Prepare the Lustre to iRODS task from FoFN """
+    _LOG_HEADER()
+
+    state = _GET_STATE()
+    job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
+
+    # Get the FoFN path and prefix from the client metadata
+    fofn = T.Path(job.metadata.fofn)
+    subcollection = job.metadata.subcollection
+
+    if job.status.phase(JobPhase.Preparation).start is not None:
+        raise DataException(f"Preparation phase has already started for job {job.job_id}")
+
+    with job.status.phase(JobPhase.Preparation):
+        log.info("Preparation phase started")
+
+        # Setup the transfer route
+        route = posix_to_irods_factory(*_FILESYSTEMS)
+        route += strip_common_prefix
+        route += prefix(T.Path(f"/humgen/shepherd_testing/{subcollection}"))
+        route += debugging
+        route += telemetry
+
+        tasks = 0
+        lustre, *_ = _FILESYSTEMS
+        files = lustre._identify_by_fofn(fofn)
+        for task in route.plan(files):
+            log.info(f"{task.source.address} on {task.source.filesystem} to "
+                     f"{task.target.address} on {task.target.filesystem}")
+
+            # NOTE With just one step in our route, we have no
+            # inter-task dependencies
+            job += DependentTask(task)
+            tasks += 1
+
+        log.info(f"Added {tasks} tasks to the job")
+
+    log.info("Preparation phase complete")
+
+
+def transfer(job_id:str) -> None:
     ...
 
 
-def transfer() -> None:
+def status(job_id:str) -> None:
     ...
 
 
-# def _print_status(status:JobStatus) -> None:
-#     log(f"* Pending:   {status.pending}")
-#     log(f"* Running:   {status.running}")
-#     log(f"* Failed:    {status.failed}")
-#     log(f"* Succeeded: {status.succeeded}")
-#
-#
-# def prepare_state_from_fofn(state_root:str, fofn:str, subcollection:str) -> None:
-#     """ Lustre to iRODS state from FoFN """
-#     transfer = posix_to_irods_factory(_FS["Lustre"], _FS["iRODS"])
-#     transfer += strip_common_prefix
-#     transfer += prefix(T.Path(f"/humgen/shepherd_testing/{subcollection}"))
-#     transfer += debugging
-#     transfer += telemetry
-#
-#     job = NativeJob(T.Path(state_root))
-#     job.filesystem_mapping = _FS
-#
-#     # FIXME the maximum concurrency is a property of the filesystems
-#     # involved in a task, rather than that of an entire job...
-#     job.max_concurrency = min(fs.max_concurrency for fs in _FS.values())
-#
-#     log(f"State:            {state_root}")
-#     log(f"Job ID:           {job.job_id}")
-#     log(f"Max. Attempts:    {job.max_attempts}")
-#     log(f"Max. Concurrency: {job.max_concurrency}")
-#
-#     tasks = 0
-#     files = _FS["Lustre"]._identify_by_fofn(T.Path(fofn))
-#     for task in transfer.plan(files):
-#         log(("=" if tasks == 0 else "-") * 72)
-#
-#         job += task
-#         tasks += 1
-#
-#         log(f"Source: {task.source.filesystem} {task.source.address}")
-#         log(f"Target: {task.target.filesystem} {task.target.address}")
-#
-#     log("=" * 72)
-#     log(f"Added {tasks} tasks to job:")
-#     _print_status(job.status)
-#
-#     lsf = _EXEC[_CLUSTER]
-#     lsf_options = LSFSubmissionOptions(
-#         cores  = 4,
-#         memory = 1000,
-#         group  = "hgi",
-#         queue  = "long")
-#
-#     worker = Job(f"\"{_BINARY}\" __exec \"{state_root}\" \"{job.job_id}\"")
-#     worker.workers = job.max_concurrency
-#     worker.stdout = worker.stderr = T.Path(state_root) / "run.%I.log"
-#
-#     runners = list(lsf.submit(worker, lsf_options))
-#
-#     log(f"Execution job submitted with ID {runners[0].job} and {len(runners)} workers")
-#
-#
 # def run_state(state_root:str, job_id:str) -> None:
 #     """ Run through tasks in state database """
 #     job = NativeJob(T.Path(state_root), job_id=int(job_id), force_restart=True)
