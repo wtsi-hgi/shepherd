@@ -43,7 +43,7 @@ _BINARY = T.Path(sys.argv[0]).resolve()
 
 # Approximate start time for the process, plus a conservative threshold
 _START_TIME = time.now()
-_FUDGE_TIME = time.delta(minutes=10)
+_FUDGE_TIME = time.delta(minutes=5)
 
 _FILESYSTEMS = (
     POSIXFilesystem(name="Lustre", max_concurrency=50),
@@ -355,7 +355,7 @@ def status(job_id:str) -> None:
         # NOTE This is specific to Lustre-to-iRODS tasks
         throughput = current.throughput(*_FILESYSTEMS)
         log.info(f"Transfer rate: {_humansize(throughput.transfer_rate)}B/s")
-        log.info(f"Failure rate: {throughput.failure_rate:.3g}")
+        log.info(f"Failure rate: {throughput.failure_rate:.1%}")
 
     except NoThroughputData:
         log.info("Transfer rate: No data")
