@@ -19,6 +19,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 import os
 import sys
+from math import ceil, log10
 from time import sleep
 
 from common import types as T
@@ -54,6 +55,10 @@ _GET_STATE = lambda: State.PostgreSQL(
     port     = int(os.getenv("PG_PORT", "5432")))
 
 _LOG_HEADER = lambda: log.info(f"Shepherd: {_CLIENT} / lib {lib_version}")
+
+# Convenience aliases
+_PREPARE = JobPhase.Preparation
+_TRANSFER = JobPhase.Transfer
 
 
 def main(*args:str) -> None:
@@ -183,10 +188,10 @@ def prepare(job_id:str) -> None:
     fofn = T.Path(job.metadata.fofn)
     subcollection = job.metadata.subcollection
 
-    if job.status.phase(JobPhase.Preparation).start is not None:
+    if job.status.phase(_PREPARE).start is not None:
         raise DataException(f"Preparation phase has already started for job {job.job_id}")
 
-    with job.status.phase(JobPhase.Preparation):
+    with job.status.phase(_PREPARE):
         log.info("Preparation phase started")
 
         # Setup the transfer route
@@ -217,6 +222,21 @@ def transfer(job_id:str) -> None:
     ...
 
 
+_SI  = ["", "k",  "M",  "G",  "T",  "P"]
+_IEC = ["", "Ki", "Mi", "Gi", "Ti", "Pi"]
+
+def _humansize(value:float, base:int = 1024, threshold:float = 0.8) -> str:
+    """ Quick-and-dirty size quantifier """
+    quantifiers = _IEC if base == 1024 else _SI
+    sigfigs = ceil(log10(base * threshold))
+
+    order = 0
+    while order < len(quantifiers) - 1 and value > base * threshold:
+        value /= base
+        order += 1
+
+    return f"{value:.{sigfigs}g} {quantifiers[order]}"
+
 def status(job_id:str) -> None:
     """ Report job status to user """
     _LOG_HEADER()
@@ -225,8 +245,9 @@ def status(job_id:str) -> None:
     job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
     current = job.status
 
-    if not current.phase(JobPhase.Preparation).complete:
-        raise DataException(f"Preparation phase for job {job_id} has yet to complete")
+    if not current.phase(_PREPARE).complete:
+        log.warning(f"Preparation phase for job {job_id} is still in progress, "
+                    "the following output may be incomplete")
 
     log.info(f"Pending: {current.pending}")
     log.info(f"Running: {current.running}")
@@ -234,9 +255,10 @@ def status(job_id:str) -> None:
     log.info(f"Succeeded: {current.succeeded}")
 
     try:
+        # NOTE This is specific to Lustre to iRODS tasks
         throughput = current.throughput(*_FILESYSTEMS)
-        log.info(f"Transfer rate: {throughput.transfer_rate} b/s")
-        log.info(f"Failure rate: {throughput.failure_rate}")
+        log.info(f"Transfer rate: {_humansize(throughput.transfer_rate)}B/s")
+        log.info(f"Failure rate: {throughput.failure_rate:.3g}")
 
     except NoThroughputData:
         log.info("Transfer rate: No data")
