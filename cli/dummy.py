@@ -271,7 +271,7 @@ def transfer(job_id:str) -> None:
             sys.exit(0)
 
         log.info("Waiting for preparation phase to start...")
-        sleep(10)
+        sleep(_FUDGE_TIME.total_seconds())
 
     # Initialise the transfer phase (idempotent)
     job.status.phase(_TRANSFER).init()
