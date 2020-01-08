@@ -20,24 +20,30 @@ with this program. If not, see https://www.gnu.org/licenses/
 import os
 import sys
 from math import ceil, log10
+from signal import SIGTERM
 from time import sleep
 
-from common import types as T
+from common import types as T, time
 from common.logging import log
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
 from lib import __version__ as lib_version
 from lib.execution import types as Exec
 from lib.execution.lsf import LSF, LSFSubmissionOptions
+from lib.execution.lsf.context import LSFWorkerLimit
 from lib.planning.route_factories import posix_to_irods_factory
 from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
 from lib.state import postgresql as State
-from lib.state.exceptions import DataException, NoThroughputData
+from lib.state.exceptions import DataException, NoThroughputData, NoTasksAvailable
 from lib.state.types import JobPhase, DependentTask
 
 
 _CLIENT = "dummy"
 
 _BINARY = T.Path(sys.argv[0]).resolve()
+
+# Approximate start time for the process, plus a conservative threshold
+_START_TIME = time.now()
+_FUDGE_TIME = time.delta(minutes=10)
 
 _FILESYSTEMS = (
     POSIXFilesystem(name="Lustre", max_concurrency=50),
@@ -114,6 +120,21 @@ def main(*args:str) -> None:
     delegate[mode](*mode_args)
 
 
+def _transfer_worker(job_id:T.Identifier, logs:T.Path) -> T.Tuple[Exec.Job, LSFSubmissionOptions]:
+    # Setup a consistent worker job
+    worker = Exec.Job(f"\"{_BINARY}\" __transfer {job_id}")
+    worker.stdout = worker.stderr = logs / "transfer.%I.log"
+
+    options = LSFSubmissionOptions(
+        cores  = 4,
+        memory = 1000,
+        group  = os.environ["LSF_GROUP"],
+        queue  = os.environ["TRANSFER_QUEUE"]
+    )
+
+    return worker, options
+
+
 def submit(fofn:str, subcollection:str) -> None:
     """ Submit a FoFN job to the executioner """
     # Set logging directory, if not already
@@ -132,7 +153,10 @@ def submit(fofn:str, subcollection:str) -> None:
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT)
     job.max_attempts = max_attempts = int(os.getenv("MAX_ATTEMPTS", "3"))
-    job.set_metadata(fofn=str(fofn_path), subcollection=subcollection)
+    job.set_metadata(fofn          = str(fofn_path),
+                     subcollection = subcollection,
+                     logs          = str(log_dir),
+                     DAISYCHAIN    = "Yes")         # NOTE For debugging
 
     log.info(f"Created new job with ID {job.job_id}, with up to {max_attempts} attempts per task")
 
@@ -162,16 +186,8 @@ def submit(fofn:str, subcollection:str) -> None:
     # implementing complicated dynamic load handling...
     max_concurrency = min(fs.max_concurrency for fs in _FILESYSTEMS)
 
-    transfer_options = LSFSubmissionOptions(
-        cores  = 4,
-        memory = 1000,
-        group  = os.environ["LSF_GROUP"],
-        queue  = os.environ["TRANSFER_QUEUE"]
-    )
-
-    transfer_worker = Exec.Job(f"\"{_BINARY}\" __transfer {job.job_id}")
+    transfer_worker, transfer_options = _transfer_worker(job.job_id, log_dir)
     transfer_worker.workers = max_concurrency
-    transfer_worker.stdout = transfer_worker.stderr = log_dir / "transfer.%I.log"
     transfer_runners = transfer_runner, *_ = executor.submit(transfer_worker, transfer_options)
 
     log.info(f"Transfer phase submitted with LSF ID {transfer_runner.job} and {len(transfer_runners)} workers")
@@ -219,7 +235,88 @@ def prepare(job_id:str) -> None:
 
 
 def transfer(job_id:str) -> None:
-    ...
+    """ Transfer prepared tasks from Lustre to iRODS """
+    _LOG_HEADER()
+
+    state = _GET_STATE()
+    state.register_filesystems(*_FILESYSTEMS)
+    job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
+
+    executor = _GET_EXECUTOR()
+    worker = executor.worker
+
+    log.info(f"Transfer phase: Worker {worker.id.worker}")
+
+    # Launch follow-on worker, in case we run out of time
+    # NOTE DAISYCHAIN can be set to abort accidental LSF proliferation
+    following = job.metadata.DAISYCHAIN == "Yes"
+    if following:
+        follow_on, follow_options = _transfer_worker(job_id, T.Path(job.metadata.logs))
+        follow_on.specific_worker = worker.id.worker
+        follow_on += worker.id
+        follow_runner, *_ = executor.submit(follow_on, follow_options)
+
+        log.info(f"Follow-on worker submitted with LSF ID {follow_runner.job}; "
+                 "will cancel on completion")
+
+    # This is when we should wrap-up
+    deadline = _START_TIME + worker.limit(LSFWorkerLimit.Runtime) - _FUDGE_TIME
+
+    # Don't start the transfer phase until preparation has started
+    while job.status.phase(_PREPARE).start is None:
+        # Check we're not going to overrun the limit (which shouldn't
+        # happen when just waiting for the preparation phase to start)
+        if time.now() > deadline:
+            log.info("Approaching runtime limit; terminating")
+            sys.exit(0)
+
+        log.info("Waiting for preparation phase to start...")
+        sleep(10)
+
+    # Initialise the transfer phase (idempotent)
+    job.status.phase(_TRANSFER).init()
+
+    log.info("Starting transfers")
+
+    while not job.status.complete:
+        remaining_time = deadline - time.now()
+
+        try:
+            attempt = job.attempt(remaining_time)
+
+        except NoTasksAvailable:
+            # Check if we're done
+            current = job.status
+
+            if current.phase(_PREPARE) or current.pending > 0:
+                # Preparation phase is still in progress, or there are
+                # still pending tasks
+                log.warning("Cannot complete any more tasks in the given run limit; terminating")
+
+            else:
+                # All tasks have been prepared and none are pending, so
+                # cancel the follow-on
+                log.info("Nothing left do to for this worker")
+
+                if following:
+                    log.info(f"Cancelling follow-on worker with LSF ID {follow_runner.job}")
+                    executor.signal(follow_runner, SIGTERM)
+
+                # If no tasks are in-flight, then we're finished
+                if current.running == 0:
+                    log.info(f"All tasks complete")
+                    job.status.phase(_TRANSFER).stop()
+
+            sys.exit(0)
+
+        log.info("Attempting transfer of "
+                 f"{attempt.task.source.address} on {attempt.task.source.filesystem} to "
+                 f"{attempt.task.target.address} on {attempt.task.target.filesystem}")
+
+        # TODO Py3.8 walrus operator would be good here
+        success = attempt()
+        if success:
+            log.info("Transfer successful")
 
 
 _SI  = ["", "k",  "M",  "G",  "T",  "P"]
@@ -255,7 +352,7 @@ def status(job_id:str) -> None:
     log.info(f"Succeeded: {current.succeeded}")
 
     try:
-        # NOTE This is specific to Lustre to iRODS tasks
+        # NOTE This is specific to Lustre-to-iRODS tasks
         throughput = current.throughput(*_FILESYSTEMS)
         log.info(f"Transfer rate: {_humansize(throughput.transfer_rate)}B/s")
         log.info(f"Failure rate: {throughput.failure_rate:.3g}")
@@ -263,50 +360,3 @@ def status(job_id:str) -> None:
     except NoThroughputData:
         log.info("Transfer rate: No data")
         log.info("Failure rate: No data")
-
-
-# def run_state(state_root:str, job_id:str) -> None:
-#     """ Run through tasks in state database """
-#     job = NativeJob(T.Path(state_root), job_id=int(job_id), force_restart=True)
-#     job.filesystem_mapping = _FS
-#
-#     log(f"State:         {state_root}")
-#     log(f"Job ID:        {job.job_id}")
-#     log(f"Max. Attempts: {job.max_attempts}")
-#
-#     lsf = _EXEC[_CLUSTER]
-#     job.worker_index = worker_index = lsf.worker.id.worker
-#     log(f"Worker:        {worker_index} of {job.max_concurrency}")
-#
-#     try:
-#         _print_status(job.status)
-#
-#     except WorkerRedundant:
-#         log("Worker has nothing to do; terminating")
-#         exit(0)
-#
-#     tasks = 0
-#     while job.status:
-#         try:
-#             task = next(job)
-#
-#         except StopIteration:
-#             break
-#
-#         except DataNotReady:
-#             log("Not ready; sleeping...")
-#             sleep(60)
-#             continue
-#
-#         log(("=" if tasks == 0 else "-") * 72)
-#         log(f"Source: {task.source.filesystem} {task.source.address}")
-#         log(f"Target: {task.target.filesystem} {task.target.address}")
-#
-#         # TODO Check exit status and update state
-#         task()
-#
-#         tasks += 1
-#
-#     log("=" * 72)
-#     log("Done")
-#     _print_status(job.status)
