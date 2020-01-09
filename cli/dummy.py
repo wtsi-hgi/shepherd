@@ -34,7 +34,7 @@ from lib.planning.route_factories import posix_to_irods_factory
 from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
 from lib.state import postgresql as State
 from lib.state.exceptions import DataException, NoThroughputData, NoTasksAvailable
-from lib.state.types import JobPhase, DependentTask
+from lib.state.types import JobPhase, DependentTask, DataOrigin
 
 
 _CLIENT = "dummy"
@@ -133,6 +133,22 @@ def _transfer_worker(job_id:T.Identifier, logs:T.Path) -> T.Tuple[Exec.Job, LSFS
     )
 
     return worker, options
+
+
+_SI  = ["", "k",  "M",  "G",  "T",  "P"]
+_IEC = ["", "Ki", "Mi", "Gi", "Ti", "Pi"]
+
+def _human_size(value:float, base:int = 1024, threshold:float = 0.8) -> str:
+    """ Quick-and-dirty size quantifier """
+    quantifiers = _IEC if base == 1024 else _SI
+    sigfigs = ceil(log10(base * threshold))
+
+    order = 0
+    while order < len(quantifiers) - 1 and value > base * threshold:
+        value /= base
+        order += 1
+
+    return f"{value:.{sigfigs}g} {quantifiers[order]}"
 
 
 def submit(fofn:str, subcollection:str) -> None:
@@ -316,23 +332,8 @@ def transfer(job_id:str) -> None:
         # TODO Py3.8 walrus operator would be good here
         success = attempt()
         if success:
-            log.info("Transfer successful")
+            log.info(f"Successfully transferred and verified {_human_size(attempt.size(DataOrigin.Source))}B")
 
-
-_SI  = ["", "k",  "M",  "G",  "T",  "P"]
-_IEC = ["", "Ki", "Mi", "Gi", "Ti", "Pi"]
-
-def _humansize(value:float, base:int = 1024, threshold:float = 0.8) -> str:
-    """ Quick-and-dirty size quantifier """
-    quantifiers = _IEC if base == 1024 else _SI
-    sigfigs = ceil(log10(base * threshold))
-
-    order = 0
-    while order < len(quantifiers) - 1 and value > base * threshold:
-        value /= base
-        order += 1
-
-    return f"{value:.{sigfigs}g} {quantifiers[order]}"
 
 def status(job_id:str) -> None:
     """ Report job status to user """
@@ -354,7 +355,7 @@ def status(job_id:str) -> None:
     try:
         # NOTE This is specific to Lustre-to-iRODS tasks
         throughput = current.throughput(*_FILESYSTEMS)
-        log.info(f"Transfer rate: {_humansize(throughput.transfer_rate)}B/s")
+        log.info(f"Transfer rate: {_human_size(throughput.transfer_rate)}B/s")
         log.info(f"Failure rate: {throughput.failure_rate:.1%}")
 
     except NoThroughputData:
