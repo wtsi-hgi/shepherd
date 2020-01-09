@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 Genome Research Limited
+Copyright (c) 2019, 2020 Genome Research Limited
 
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
@@ -17,21 +17,71 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+import json
+import os.path
+import shlex
+import subprocess
+from dataclasses import dataclass
+
 from ... import types as T
+from ...logging import log
 from ...exceptions import NOT_IMPLEMENTED
-from .types import DataGenerator, BaseFilesystem
+from .types import DataGenerator, BaseFilesystem, UnsupportedByFilesystem
 
 
-# TODO Obviously... :P
+# TODO This is a MINIMAL iRODS filesystem implementation
+
+
+@dataclass
+class _BatonListOutput:
+    collection:str
+    data_object:str
+    size:int
+    checksum:str
+
+def _baton(address:T.Path) -> _BatonListOutput:
+    # Simple baton-list Wrapper
+    query = json.dumps({
+        "collection":  os.path.dirname(address),
+        "data_object": os.path.basename(address)
+    })
+
+    baton = subprocess.run(
+        shlex.split("baton-list --size --checksum"),
+        input = query,
+        text  = True,
+        check = True)
+
+    decoded = json.loads(baton.stdout)
+    return _BatonListOutput(**decoded)
+
+
 class iRODSFilesystem(BaseFilesystem):
     """ Filesystem implementation for iRODS filesystems """
     def __init__(self, *, name:str = "iRODS", max_concurrency:int = 10) -> None:
         self._name = name
         self.max_concurrency = max_concurrency
 
+        # Check that baton is available
+        try:
+            subprocess.run(
+                shlex.split("command -v baton-list"),
+                stdout = subprocess.DEVNULL,
+                stderr = subprocess.DEVNULL,
+                check  = True)
+
+        except subprocess.CalledProcessError:
+            log.critical("baton is not available; see http://wtsi-npg.github.io/baton for details")
+            raise
+
     def _accessible(self, address:T.Path) -> bool:
-        # TODO This must be implemented at a minimum
-        raise NOT_IMPLEMENTED
+        # FIXME This should parse the error code returned by iRODS
+        try:
+            _baton(address)
+            return True
+
+        except:
+            return False
 
     def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
         raise NOT_IMPLEMENTED
@@ -47,12 +97,11 @@ class iRODSFilesystem(BaseFilesystem):
         return ["md5"]
 
     def _checksum(self, algorithm:str, address:T.Path) -> str:
-        # TODO This must be implemented at a minimum
-        raise NOT_IMPLEMENTED
+        # NOTE algorithm will be MD5 by necessity
+        return _baton(address).checksum
 
     def _size(self, address:T.Path) -> int:
-        # TODO This must be implemented at a minimum
-        raise NOT_IMPLEMENTED
+        return _baton(address).size
 
     def set_metadata(self, address:T.Path, **metadata:str) -> None:
         raise NOT_IMPLEMENTED
