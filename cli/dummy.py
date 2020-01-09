@@ -82,7 +82,8 @@ def main(*args:str) -> None:
         "LSF_CONFIG":     "Path to LSF cluster configuration directory",
         "LSF_GROUP":      "LSF Fairshare group to run under",
         "PREP_QUEUE":     "LSF queue to use for the preparation phase",
-        "TRANSFER_QUEUE": "LSF queue to use for the transfer phase"
+        "TRANSFER_QUEUE": "LSF queue to use for the transfer phase",
+        "IRODS_BASE":     "Base iRODS collection into which to transfer"
         # "MAX_ATTEMPTS": "Maximum attempts per transfer task [3]"
         # "SHEPHERD_LOG": "Logging directory [pwd]"
     }
@@ -161,15 +162,17 @@ def submit(fofn:str, subcollection:str) -> None:
     log.to_file(log_dir / "submit.log")
 
     fofn_path = T.Path(fofn).resolve()
+    irods_base = os.environ["IRODS_BASE"]
 
     _LOG_HEADER()
     log.info(f"Logging to {log_dir}")
-    log.info(f"Will transfer contents of {fofn_path}")
+    log.info(f"Will transfer contents of {fofn_path} to {irods_base}/{subcollection}")
 
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT)
     job.max_attempts = max_attempts = int(os.getenv("MAX_ATTEMPTS", "3"))
     job.set_metadata(fofn          = str(fofn_path),
+                     irods_base    = irods_base,
                      subcollection = subcollection,
                      logs          = str(log_dir),
                      DAISYCHAIN    = "Yes")         # NOTE For debugging
@@ -218,6 +221,7 @@ def prepare(job_id:str) -> None:
 
     # Get the FoFN path and prefix from the client metadata
     fofn = T.Path(job.metadata.fofn)
+    irods_base = T.Path(job.metadata.irods_base)
     subcollection = job.metadata.subcollection
 
     if job.status.phase(_PREPARE).start is not None:
@@ -229,7 +233,7 @@ def prepare(job_id:str) -> None:
         # Setup the transfer route
         route = posix_to_irods_factory(*_FILESYSTEMS)
         route += strip_common_prefix
-        route += prefix(T.Path(f"/humgen/shepherd_testing/{subcollection}"))
+        route += prefix(irods_base / subcollection)
         route += debugging
         route += telemetry
 
