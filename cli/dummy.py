@@ -23,6 +23,7 @@ from math import ceil, log10
 from signal import SIGTERM
 from time import sleep
 
+from cli import __version__ as cli_version
 from common import types as T, time
 from common.logging import log
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
@@ -60,7 +61,7 @@ _GET_STATE = lambda: State.PostgreSQL(
     host     = os.environ["PG_HOST"],
     port     = int(os.getenv("PG_PORT", "5432")))
 
-_LOG_HEADER = lambda: log.info(f"Shepherd: {_CLIENT} / lib {lib_version}")
+_LOG_HEADER = lambda: log.info(f"Shepherd: {_CLIENT} {cli_version} / lib {lib_version}")
 
 # Convenience aliases
 _PREPARE = JobPhase.Preparation
