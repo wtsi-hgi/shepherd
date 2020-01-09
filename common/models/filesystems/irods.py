@@ -30,6 +30,7 @@ class iRODSFilesystem(BaseFilesystem):
         self.max_concurrency = max_concurrency
 
     def _accessible(self, address:T.Path) -> bool:
+        # TODO This must be implemented at a minimum
         raise NOT_IMPLEMENTED
 
     def _identify_by_metadata(self, **metadata:str) -> DataGenerator:
@@ -46,9 +47,11 @@ class iRODSFilesystem(BaseFilesystem):
         return ["md5"]
 
     def _checksum(self, algorithm:str, address:T.Path) -> str:
+        # TODO This must be implemented at a minimum
         raise NOT_IMPLEMENTED
 
     def _size(self, address:T.Path) -> int:
+        # TODO This must be implemented at a minimum
         raise NOT_IMPLEMENTED
 
     def set_metadata(self, address:T.Path, **metadata:str) -> None:
