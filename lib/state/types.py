@@ -349,6 +349,10 @@ class BaseJob(T.Iterator[BaseAttempt], metaclass=ABCMeta):
     @abstractmethod
     def __iadd__(self, task:DependentTask) -> BaseJob:
         """ Add a sequence of dependent tasks to the job """
+        # NOTE The root source is assumed to exist, so we can query its
+        # size. Ideally, this size should be persisted along with the
+        # task, as THERE IS NO OTHER INTERFACE FOR DOING SO. Without it,
+        # it would be impossible to make transfer rate calculations.
 
     def __iter__(self) -> BaseJob:
         return self

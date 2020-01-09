@@ -241,7 +241,8 @@ def prepare(job_id:str) -> None:
                      f"{task.target.address} on {task.target.filesystem}")
 
             # NOTE With just one step in our route, we have no
-            # inter-task dependencies
+            # inter-task dependencies; the source size is persisted
+            # automatically, for subsequent transfer rate calculations.
             job += DependentTask(task)
             tasks += 1
 
