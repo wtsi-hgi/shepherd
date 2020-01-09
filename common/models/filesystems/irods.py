@@ -65,10 +65,11 @@ class iRODSFilesystem(BaseFilesystem):
         # Check that baton is available
         try:
             subprocess.run(
-                shlex.split("command -v baton-list"),
+                "command -v baton-list",
                 stdout = subprocess.DEVNULL,
                 stderr = subprocess.DEVNULL,
-                check  = True)
+                check  = True,
+                shell  = True)
 
         except subprocess.CalledProcessError:
             log.critical("baton is not available; see http://wtsi-npg.github.io/baton for details")
