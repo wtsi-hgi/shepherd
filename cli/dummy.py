@@ -328,10 +328,6 @@ def transfer(job_id:str) -> None:
 
             sys.exit(0)
 
-        log.info("Attempting transfer of "
-                 f"{attempt.task.source.address} on {attempt.task.source.filesystem} to "
-                 f"{attempt.task.target.address} on {attempt.task.target.filesystem}")
-
         # TODO Py3.8 walrus operator would be good here
         success = attempt()
         if success:
