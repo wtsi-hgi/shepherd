@@ -48,9 +48,10 @@ def _baton(address:T.Path) -> _BatonListOutput:
 
     baton = subprocess.run(
         shlex.split("baton-list --size --checksum"),
-        input = query,
-        text  = True,
-        check = True)
+        input          = query,
+        capture_output = True,
+        text           = True,
+        check          = True)
 
     decoded = json.loads(baton.stdout)
     return _BatonListOutput(**decoded)
