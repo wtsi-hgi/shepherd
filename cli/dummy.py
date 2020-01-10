@@ -205,9 +205,9 @@ def submit(fofn:str, subcollection:str) -> None:
 
     transfer_worker, transfer_options = _transfer_worker(job.job_id, log_dir)
     transfer_worker.workers = max_concurrency
-    transfer_runners = transfer_runner, *_ = executor.submit(transfer_worker, transfer_options)
+    transfer_runners = transfer_runner, *_ = list(executor.submit(transfer_worker, transfer_options))
 
-    log.info(f"Transfer phase submitted with LSF ID {transfer_runner.job} and {len(list(transfer_runners))} workers")
+    log.info(f"Transfer phase submitted with LSF ID {transfer_runner.job} and {len(transfer_runners)} workers")
 
 
 def prepare(job_id:str) -> None:
