@@ -202,11 +202,11 @@ class PGAttempt(BaseAttempt):
             script = task.script,
             source = Data(
                 filesystem = state.filesystem_convertor(task.source_fs),
-                address    = task.source
+                address    = T.Path(task.source)
             ),
             target = Data(
                 filesystem = state.filesystem_convertor(task.target_fs),
-                address    = task.target
+                address    = T.Path(task.target)
             )
         )
 
