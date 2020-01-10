@@ -127,10 +127,10 @@ class PGJobStatus(BaseJobStatus):
             """, (job_id,))
 
             status = c.fetchone()
-            self.pending   = status.pending
-            self.running   = status.running
-            self.failed    = status.failed
-            self.succeeded = status.succeeded
+            self.pending   = status.pending   if status else 0
+            self.running   = status.running   if status else 0
+            self.failed    = status.failed    if status else 0
+            self.succeeded = status.succeeded if status else 0
 
     def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
         with self._state.transaction() as c:
