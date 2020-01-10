@@ -273,7 +273,7 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                 properties = executor.submit(self._get_source_properties, "md5")
 
                 # Run task in main tread and join on properties thread
-                self.exit_code = success = self.task()
+                success = self.task()
                 source_size, source_checksums = properties.result()
 
             if not success:
@@ -287,7 +287,7 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                                     f"Source is {source_size} bytes; "
                                     f"target is {target_size} bytes")
 
-                        self.exit_code = success = _MISMATCHED_SIZE
+                        success = _MISMATCHED_SIZE
                         raise _VerificationFailure()
 
                     # TODO Different/multiple checksum algorithms
@@ -298,7 +298,7 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                                     f"Source has checksum {source_checksum}; "
                                     f"target has checksum {target_checksum}")
 
-                        self.exit_code = success = _MISMATCHED_CHECKSUM
+                        success = _MISMATCHED_CHECKSUM
                         raise _VerificationFailure()
 
                     # TODO Data metadata: There is no need to set this
@@ -309,6 +309,7 @@ class BaseAttempt(_AttemptMixin, _BaseDurationMixin, metaclass=ABCMeta):
                 except _VerificationFailure:
                     pass
 
+            self.exit_code = success
             return bool(success)
 
 
