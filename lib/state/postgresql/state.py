@@ -172,7 +172,7 @@ class PGAttempt(BaseAttempt):
         with state.transaction() as c:
             c.execute("""
                 select tasks.script,
-                       source.id      as source_id
+                       source.id      as source_id,
                        source_fs.name as source_fs,
                        source.address as source,
                        target.id      as target_id,
