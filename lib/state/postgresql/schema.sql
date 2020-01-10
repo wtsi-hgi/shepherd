@@ -27,7 +27,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2020-01-03';
+  schema date := timestamp '2020-01-10';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -482,7 +482,7 @@ create or replace view todo as
 
   join      data as source
   on        source.id = tasks.source
-  join      size as source_size
+  left join size as source_size
   on        source_size.data = source.id
   join      filesystem_status as source_fs
   on        source_fs.filesystem = source.filesystem
@@ -492,7 +492,7 @@ create or replace view todo as
   join      filesystem_status as target_fs
   on        target_fs.filesystem = target.filesystem
 
-  join      job_throughput as stats
+  left join job_throughput as stats
   on        stats.job    = jobs.id
   and       stats.source = source.filesystem
   and       stats.target = target.filesystem
