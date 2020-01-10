@@ -21,7 +21,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 # https://docs.python.org/3/whatsnew/3.7.html#pep-563-postponed-evaluation-of-annotations
 from __future__ import annotations
 
-from pathlib import Path
+import importlib.resources as resource
 
 # TODO This is here for the type annotation, but we ought to decouple
 from psycopg2.extensions import cursor
@@ -35,9 +35,6 @@ from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
                     JobPhase, JobThroughput, DependentTask, DataOrigin, \
                     FORCIBLY_TERMINATED
 from ..exceptions import *
-
-
-_SCHEMA = Path("lib/state/postgresql/schema.sql")
 
 
 # Map our Python JobPhase enum to our PostgreSQL job_phase enum
@@ -331,7 +328,8 @@ class PGJob(BaseJob):
 
         # Create schema (idempotent)
         try:
-            state.execute_script(_SCHEMA)
+            with resource.path("lib.state.postgresql", "schema.sql") as schema:
+                state.execute_script(schema)
 
         except LogicException as e:
             message = f"Could not create schema\n{e}"

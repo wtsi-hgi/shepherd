@@ -17,7 +17,8 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from common import types as T
+import importlib.resources as resource
+
 from common.models.filesystems import POSIXFilesystem, iRODSFilesystem
 from .templating import transfer_script
 from .types import FilesystemVertex, TransferRoute, PolynomialComplexity, On
@@ -27,9 +28,9 @@ from .types import FilesystemVertex, TransferRoute, PolynomialComplexity, On
 # will be defined in software or by configuration
 
 
-_posix_to_irods = T.Path("lib/planning/templates/posix_to_irods.sh.j2")
-_script = transfer_script(_posix_to_irods.read_text())
+with resource.path("lib.planning.templates", "posix_to_irods.sh.j2") as _template:
+    _SCRIPT = transfer_script(_template.read_text())
 
 def posix_to_irods_factory(posix:POSIXFilesystem, irods:iRODSFilesystem, *, cost:PolynomialComplexity = On) -> TransferRoute:
     """ Create POSIX to iRODS route """
-    return TransferRoute(FilesystemVertex(posix), FilesystemVertex(irods), templating=_script, cost=cost)
+    return TransferRoute(FilesystemVertex(posix), FilesystemVertex(irods), templating=_SCRIPT, cost=cost)
