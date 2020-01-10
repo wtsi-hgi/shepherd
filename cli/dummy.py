@@ -69,9 +69,6 @@ _TRANSFER = JobPhase.Transfer
 
 
 def main(*args:str) -> None:
-    # Log everything to standard output streams
-    log.to_tty()
-
     # Expected environment variables (commented out entries are
     # optional, listed for documentation's sake)
     envvars = {
