@@ -22,6 +22,7 @@ import os.path
 import shlex
 import subprocess
 from dataclasses import dataclass
+from functools import lru_cache
 
 from ... import types as T
 from ...logging import log
@@ -39,6 +40,7 @@ class _BatonListOutput:
     size:int
     checksum:str
 
+@lru_cache(maxsize=1)
 def _baton(address:T.Path) -> _BatonListOutput:
     # Simple baton-list Wrapper
     query = json.dumps({
