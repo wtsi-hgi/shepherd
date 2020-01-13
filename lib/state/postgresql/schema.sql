@@ -165,7 +165,7 @@ create table if not exists size (
 
   -- Size in bytes
   size
-    integer
+    numeric
     not null
     check (size >= 0)
 );
