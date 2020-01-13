@@ -336,9 +336,7 @@ class PGJob(BaseJob):
         # Create schema (idempotent)
         try:
             with resource.path("lib.state.postgresql", "schema.sql") as schema:
-                log.debug("Initialising schema")
                 state.execute_script(schema)
-                log.debug("Schema initialised")
 
         except LogicException as e:
             message = f"Could not create schema\n{e}"
