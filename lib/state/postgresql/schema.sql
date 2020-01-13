@@ -27,7 +27,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2020-01-10';
+  schema date := timestamp '2020-01-13';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -292,16 +292,17 @@ create index if not exists attempts_completed on attempts(task, exit_code) where
 -- have yet to be attempted; the latter of which have an attempt index
 -- of 0 and are semantically "unsuccessful".
 create or replace view task_status as
-  select attempts.task,                                                    -- Task ID
-         row_number() over history as attempt,                             -- Attempt index
-         attempts.start,                                                   -- Start timestamp
-         attempts.finish,                                                  -- Finish timestamp
-         attempts.exit_code,                                               -- Exit code
-         (row_number() over history) = (count(1) over history) as latest,  -- Latest predicate
-         attempts.exit_code = 0 as succeeded                               -- Success predicate (null => in progress)
+  select attempts.task,                                                      -- Task ID
+         row_number() over history as attempt,                               -- Attempt index
+         attempts.start,                                                     -- Start timestamp
+         attempts.finish,                                                    -- Finish timestamp
+         attempts.exit_code,                                                 -- Exit code
+         (row_number() over history) = (count(1) over each_task) as latest,  -- Latest predicate
+         attempts.exit_code = 0 as succeeded                                 -- Success predicate (null => in progress)
   from   attempts
-  window history as (partition by attempts.task
-                     order by     attempts.start asc nulls last)
+  window each_task as (partition by attempts.task),
+         history   as (partition by attempts.task
+                       order by     attempts.start asc nulls last)
 
   union all
 
