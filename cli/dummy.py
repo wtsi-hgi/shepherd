@@ -354,7 +354,7 @@ def status(job_id:str) -> None:
     try:
         # NOTE This is specific to Lustre-to-iRODS tasks
         throughput = current.throughput(*_FILESYSTEMS)
-        log.info(f"Transfer rate: {_human_size(throughput.transfer_rate)}B/s")
+        log.info(f"Transfer rate: {_human_size(throughput.transfer_rate)}B/s per worker")
         log.info(f"Failure rate: {throughput.failure_rate:.1%}")
 
     except NoThroughputData:
