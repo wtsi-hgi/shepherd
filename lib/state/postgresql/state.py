@@ -76,9 +76,16 @@ class PGPhaseStatus(BasePhaseStatus):
         # Set the start time, if it hasn't been already, and return it
         if self.start is None:
             with self._state.transaction() as c:
+                # NOTE In the below, the returning clause will only
+                # return if a change was made, thus we forcibly make a
+                # redundant change (rather than "do nothing") on
+                # conflicts. Such a conflict could occur because
+                # multiple workers may try to initialise the phase.
                 c.execute("""
                     insert into job_timestamps (job, phase)
                                         values (%s, %s)
+                                   on conflict (job, phase)
+                                 do update set job = excluded.job
                                      returning start;
                 """, (self._job_id, self._phase))
 
