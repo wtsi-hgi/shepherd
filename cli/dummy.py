@@ -342,6 +342,8 @@ def status(job_id:str) -> None:
     job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
     current = job.status
 
+    log.info(f"Job ID: {job_id}")
+
     if not current.phase(_PREPARE).complete:
         log.warning(f"Preparation phase for job {job_id} is still in progress, "
                     "the following output may be incomplete")
