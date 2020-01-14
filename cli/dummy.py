@@ -35,7 +35,7 @@ from lib.planning.route_factories import posix_to_irods_factory
 from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
 from lib.state import postgresql as State
 from lib.state.exceptions import DataException, NoThroughputData, NoTasksAvailable
-from lib.state.types import JobPhase, DependentTask, DataOrigin
+from lib.state.types import BasePhaseStatus, JobPhase, DependentTask, DataOrigin
 
 
 _CLIENT = "dummy"
@@ -338,22 +338,39 @@ def transfer(job_id:str) -> None:
             log.info(f"Successfully transferred and verified {_human_size(attempt.size(DataOrigin.Source))}B")
 
 
+def _phase_status(phase:BasePhaseStatus) -> str:
+    # Consistent phase status output
+    if phase.start is None:
+        return "Waiting to start"
+
+    if phase.complete:
+        return f"Completed at {phase.finish}; duration {phase.runtime}"
+
+    return f"In progress; started at {phase.start}"
+
 def status(job_id:str) -> None:
     """ Report job status to user """
     _LOG_HEADER()
 
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
+
     current = job.status
+    prep_phase     = current.phase(_PREPARE)
+    transfer_phase = current.phase(_TRANSFER)
 
     log.info(f"Job ID: {job_id}")
 
-    if not current.phase(_PREPARE).complete:
-        log.warning(f"Preparation phase for job {job_id} is still in progress, "
-                    "the following output may be incomplete")
+    log.info(f"Preparation phase: {_phase_status(prep_phase)}")
+    if not prep_phase.complete:
+        log.warning("The following output may be incomplete")
 
-    log.info(f"Pending: {current.pending}")
-    log.info(f"Running: {current.running}")
+    log.info(f"Transfer phase: {_phase_status(transfer_phase)}")
+
+    if not transfer_phase.complete:
+        log.info(f"Pending: {current.pending}")
+        log.info(f"Running: {current.running}")
+
     log.info(f"Failed: {current.failed}")
     log.info(f"Succeeded: {current.succeeded}")
 
