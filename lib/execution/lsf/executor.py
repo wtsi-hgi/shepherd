@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 Genome Research Limited
+Copyright (c) 2019, 2020 Genome Research Limited
 
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
@@ -121,7 +121,7 @@ class LSF(BaseExecutor):
         job_id = utils.lsf_job_id(worker)
         bkill  = utils.run(f"bkill -s {signum} {job_id}")
 
-        if bkill.returncode != 0 or bkill.stderr is not None:
+        if bkill.returncode != 0 or bkill.stderr != "":
             if "No matching job found" in bkill.stderr:
                 raise NoSuchWorker(f"No such LSF job: {job_id}")
 
