@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+import json
 import os
 import sys
 from math import ceil, log10
@@ -154,7 +155,7 @@ def _human_size(value:float, base:int = 1024, threshold:float = 0.8) -> str:
     return f"{value:.{sigfigs}g} {quantifiers[order]}"
 
 
-def submit(fofn:str, subcollection:str) -> None:
+def submit(fofn:str, subcollection:str, metadata:str) -> None:
     """ Submit a FoFN job to the executioner """
     # Set logging directory, if not already
     if "SHEPHERD_LOG" not in os.environ:
@@ -165,19 +166,22 @@ def submit(fofn:str, subcollection:str) -> None:
 
     fofn_path = T.Path(fofn).resolve()
     irods_base = os.environ["IRODS_BASE"]
+    metadata_path = T.Path(metadata).resolve()
 
     _LOG_HEADER()
     log.info(f"Logging to {log_dir}")
     log.info(f"Will transfer contents of {fofn_path} to {irods_base}/{subcollection}")
+    log.info(f"Will apply metadata from {metadata_path} to each file")
 
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT)
     job.max_attempts = max_attempts = int(os.getenv("MAX_ATTEMPTS", "3"))
-    job.set_metadata(fofn          = str(fofn_path),
-                     irods_base    = irods_base,
-                     subcollection = subcollection,
-                     logs          = str(log_dir),
-                     DAISYCHAIN    = _DAISYCHAIN)   # NOTE For debugging
+    job.set_metadata(fofn            = str(fofn_path),
+                     irods_base      = irods_base,
+                     subcollection   = subcollection,
+                     logs            = str(log_dir),
+                     shitty_metadata = str(metadata_path),
+                     DAISYCHAIN      = _DAISYCHAIN) # NOTE For debugging
 
     log.info(f"Created new job with ID {job.job_id}, with up to {max_attempts} attempts per task")
 
@@ -285,6 +289,10 @@ def transfer(job_id:str) -> None:
     # This is when we should wrap-up
     deadline = _START_TIME + worker.limit(LSFWorkerLimit.Runtime) - _FUDGE_TIME
 
+    # HACK: Load metadata
+    with T.Path(job.metadata.shitty_metadata).open() as metadata_handle:
+        metadata = json.load(metadata_handle)
+
     # Don't start the transfer phase until preparation has started
     while job.status.phase(_PREPARE).start is None:
         # Check we're not going to overrun the limit (which shouldn't
@@ -336,6 +344,16 @@ def transfer(job_id:str) -> None:
         success = attempt()
         if success:
             log.info(f"Successfully transferred and verified {_human_size(attempt.size(DataOrigin.Source))}B")
+
+            # HACK: Set metadata
+            target = attempt.task.target
+            log.info(f"Applying metadata to {target.address} on {target.filesystem}")
+            target.filesystem.set_metadata(
+                target.address,
+                **{
+                    **metadata,
+                    "source": str(attempt.task.source.address)
+                })
 
 
 def _phase_status(phase:BasePhaseStatus) -> str:
