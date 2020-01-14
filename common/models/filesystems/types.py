@@ -185,6 +185,7 @@ class BaseFilesystem(T.Named, metaclass=ABCMeta):
         @param   address   Location of file
         @param   metadata  Key-value pairs
         """
+        # FIXME? Should this check accessibility like size and checksum?
 
     @abstractmethod
     def delete_metadata(self, address:T.Path, *keys:str) -> None:
@@ -195,6 +196,7 @@ class BaseFilesystem(T.Named, metaclass=ABCMeta):
         @param   keys     Keys to delete
         """
         # FIXME Is this needed?
+        # FIXME? Should this check accessibility like size and checksum?
 
     @abstractmethod
     def delete_data(self, address:T.Path) -> None:

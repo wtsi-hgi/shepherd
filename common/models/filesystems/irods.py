@@ -86,8 +86,9 @@ class _iRODSUser:
 
 
 _REQUIREMENTS = [
-    ("baton-list", "baton is not available; see http://wtsi-npg.github.io/baton for details"),
-    ("iuserinfo",  "icommands not found; see https://irods.org/download for details")
+    ("baton-list",    "baton is not available; see http://wtsi-npg.github.io/baton for details"),
+    ("baton-metamod", "baton is not available; see http://wtsi-npg.github.io/baton for details"),
+    ("iuserinfo",     "icommands not found; see https://irods.org/download for details")
 ]
 
 # Some iRODS error numbers
@@ -159,7 +160,28 @@ class iRODSFilesystem(BaseFilesystem):
         return _baton(address).size
 
     def set_metadata(self, address:T.Path, **metadata:str) -> None:
-        raise NOT_IMPLEMENTED
+        # Simple baton-metamod Wrapper
+        # FIXME? This is very similar to the baton-list wrapper
+        query = json.dumps({
+            "collection":  os.path.dirname(address),
+            "data_object": os.path.basename(address),
+            "avus": [
+                {"attribute": key, "value": str(value)}
+                for key, value in metadata.items()
+            ]
+        })
+
+        try:
+            baton = subprocess.run(
+                shlex.split("baton-metamod --operation add"),
+                input          = query,
+                capture_output = True,
+                text           = True,
+                check          = True)
+
+        except:
+            # FIXME Just log that it didn't work and carry on regardless
+            log.error(f"Failed to set metadata for {address}")
 
     def delete_metadata(self, address:T.Path, *keys:str) -> None:
         raise NOT_IMPLEMENTED
