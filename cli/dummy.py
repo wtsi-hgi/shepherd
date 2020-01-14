@@ -274,18 +274,6 @@ def transfer(job_id:str) -> None:
 
     log.info(f"Transfer phase: Worker {worker.id.worker}")
 
-    # Launch follow-on worker, in case we run out of time
-    # NOTE DAISYCHAIN can be set to abort accidental LSF proliferation
-    following = job.metadata.DAISYCHAIN == _DAISYCHAIN_TRUE
-    if following:
-        follow_on, follow_options = _transfer_worker(job_id, T.Path(job.metadata.logs))
-        follow_on.specific_worker = worker.id.worker
-        follow_on += worker.id
-        follow_runner, *_ = executor.submit(follow_on, follow_options)
-
-        log.info(f"Follow-on worker submitted with LSF ID {follow_runner.job}; "
-                 "will cancel on completion")
-
     # This is when we should wrap-up
     deadline = _START_TIME + worker.limit(LSFWorkerLimit.Runtime) - _FUDGE_TIME
 
@@ -306,6 +294,21 @@ def transfer(job_id:str) -> None:
 
     # Initialise the transfer phase (idempotent)
     job.status.phase(_TRANSFER).init()
+    if job.status.complete:
+        log.info("Nothing left do to for this worker")
+        sys.exit(0)
+
+    # Launch follow-on worker, in case we run out of time
+    # NOTE DAISYCHAIN can be set to abort accidental LSF proliferation
+    following = job.metadata.DAISYCHAIN == _DAISYCHAIN_TRUE
+    if following:
+        follow_on, follow_options = _transfer_worker(job_id, T.Path(job.metadata.logs))
+        follow_on.specific_worker = worker.id.worker
+        follow_on += worker.id
+        follow_runner, *_ = executor.submit(follow_on, follow_options)
+
+        log.info(f"Follow-on worker submitted with LSF ID {follow_runner.job}; "
+                 "will cancel on completion")
 
     log.info("Starting transfers")
 
