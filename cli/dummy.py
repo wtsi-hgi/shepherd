@@ -44,7 +44,7 @@ _BINARY = T.Path(sys.argv[0]).resolve()
 
 # Approximate start time for the process, plus a conservative threshold
 _START_TIME = time.now()
-_FUDGE_TIME = time.delta(minutes=5)
+_FUDGE_TIME = time.delta(minutes=3)
 
 _FILESYSTEMS = (
     POSIXFilesystem(name="Lustre", max_concurrency=50),
@@ -62,6 +62,9 @@ _GET_STATE = lambda: State.PostgreSQL(
     port     = int(os.getenv("PG_PORT", "5432")))
 
 _LOG_HEADER = lambda: log.info(f"Shepherd: {_CLIENT} {cli_version} / lib {lib_version}")
+
+_DAISYCHAIN_TRUE = "Yes"
+_DAISYCHAIN = os.getenv("DAISYCHAIN", _DAISYCHAIN_TRUE)
 
 # Convenience aliases
 _PREPARE = JobPhase.Preparation
@@ -84,6 +87,7 @@ def main(*args:str) -> None:
         "IRODS_BASE":     "Base iRODS collection into which to transfer"
         # "MAX_ATTEMPTS": "Maximum attempts per transfer task [3]"
         # "SHEPHERD_LOG": "Logging directory [pwd]"
+        # "DAISYCHAIN":   "Automatically daisychain transfer workers [Yes]"
     }
 
     # Mode delegation routines
@@ -173,7 +177,7 @@ def submit(fofn:str, subcollection:str) -> None:
                      irods_base    = irods_base,
                      subcollection = subcollection,
                      logs          = str(log_dir),
-                     DAISYCHAIN    = "Yes")         # NOTE For debugging
+                     DAISYCHAIN    = _DAISYCHAIN)   # NOTE For debugging
 
     log.info(f"Created new job with ID {job.job_id}, with up to {max_attempts} attempts per task")
 
@@ -268,7 +272,7 @@ def transfer(job_id:str) -> None:
 
     # Launch follow-on worker, in case we run out of time
     # NOTE DAISYCHAIN can be set to abort accidental LSF proliferation
-    following = job.metadata.DAISYCHAIN == "Yes"
+    following = job.metadata.DAISYCHAIN == _DAISYCHAIN_TRUE
     if following:
         follow_on, follow_options = _transfer_worker(job_id, T.Path(job.metadata.logs))
         follow_on.specific_worker = worker.id.worker
