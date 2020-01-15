@@ -464,7 +464,7 @@ class PGJob(BaseJob):
 
     def attempt(self, time_limit:T.Optional[T.TimeDelta] = None) -> PGAttempt:
         with self._state.transaction() as c:
-            with c.lock("attempts"):
+            with c.table_lock("attempts"):
                 if time_limit is None:
                     query = """
                         select task
