@@ -25,6 +25,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import AbstractContextManager
 
 from common import types as T, time
 from common.logging import log
@@ -100,7 +101,7 @@ class _DurationMixin:
         # Truthy once there's a finish timestamp
         return self.finish is not None
 
-class _BaseDurationMixin(_DurationMixin, metaclass=ABCMeta):
+class _BaseDurationMixin(_DurationMixin, AbstractContextManager, metaclass=ABCMeta):
     """
     Abstract base class for setting the start and finish timestamps
 
@@ -121,7 +122,7 @@ class _BaseDurationMixin(_DurationMixin, metaclass=ABCMeta):
 
     def __exit__(self, *exception) -> bool:
         self.stop()
-        return not exception  # FIXME? Is this right?
+        return False
 
 
 @dataclass(frozen=True)
