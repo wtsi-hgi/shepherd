@@ -446,9 +446,9 @@ class PGJob(BaseJob):
                 # dependency, if it has one, so only add data records to
                 # the database when we need to; otherwise we'd trip over
                 # the uniqueness constraint set by the schema
-                "source_id":     self._add_data(c, task.task.source, True) if root_task else \
-                                 PGJob._get_target_id(c, dependency),
-                "target_id":     self._add_data(c, task.task.target),
+                "source_id":     self._add_data(t, task.task.source, True) if root_task else \
+                                 PGJob._get_target_id(t, dependency),
+                "target_id":     self._add_data(t, task.task.target),
 
                 "script":        task.task.script,
                 "dependency_id": dependency
