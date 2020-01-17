@@ -275,6 +275,9 @@ def resume(job_id:str, force:T.Optional[str] = None) -> None:
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
 
+    log_dir = T.Path(job.metadata.logs)
+    log.to_file(log_dir / "resume.log")
+
     if job.status.phase(_PREPARE).start is None:
         log.error(f"Preparation phase for job {job_id} has yet to start; cannot resume.")
         sys.exit(1)
