@@ -33,6 +33,11 @@ from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
 from ..exceptions import *
 
 
+# FIXME [CRITICAL] If size/checksum mismatches are detected during an
+# attempt, there is no mechanism to invalidate them, so they'll persist,
+# even if they're correct in subsequent attempts.
+
+
 # Map our Python JobPhase enum to our PostgreSQL job_phase enum
 _PG_PHASE_ENUM = {
     JobPhase.Preparation: "prepare",
@@ -248,6 +253,9 @@ class PGAttempt(BaseAttempt):
         return self.finish
 
     def size(self, origin:DataOrigin) -> int:
+        # FIXME [CRITICAL] If the sizes don't match during an attempt,
+        # the below provides no mechanism for overriding previous sizes.
+
         # FIXME size and checksum are very similar
         data_id, data = self._origin_id[origin]
 
@@ -272,6 +280,10 @@ class PGAttempt(BaseAttempt):
         return record.size
 
     def checksum(self, origin:DataOrigin, algorithm:str) -> str:
+        # FIXME [CRITICAL] If the checksums don't match during an
+        # attempt, the below provides no mechanism for overriding
+        # previous checksums.
+
         # FIXME size and checksum are very similar
         data_id, data = self._origin_id[origin]
 
