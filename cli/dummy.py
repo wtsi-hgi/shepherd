@@ -94,6 +94,7 @@ def main(*args:str) -> None:
     # Mode delegation routines
     delegate = {
         "submit":     submit,
+        "resume":     resume,
         "status":     status,
         "__prepare":  prepare,
         "__transfer": transfer
@@ -137,6 +138,27 @@ def _transfer_worker(job_id:T.Identifier, logs:T.Path) -> T.Tuple[Exec.Job, LSFS
     )
 
     return worker, options
+
+def _submit_transfer(job:State.Job, executor:Exec.BaseExecutor) -> None:
+    # Submit the transfer workers
+    log_dir = T.Path(job.metadata.logs)
+
+    # NOTE We're only dealing with the Lustre-iRODS tuple, so this is
+    # simplified considerably. In a multi-route context, the maximum
+    # concurrency should be a function of the pairwise minimum of
+    # filesystems' maximum concurrencies for each stage of the route.
+    # That function could be, e.g.: max for maximum speed, but also
+    # maximum waste (in terms of redundant workers); min (or some lower
+    # constant) for zero wastage, but longer flight times. The
+    # arithmetic mean would probably be a good thing to go for, without
+    # implementing complicated dynamic load handling...
+    max_concurrency = min(fs.max_concurrency for fs in _FILESYSTEMS)
+
+    transfer_worker, transfer_options = _transfer_worker(job.job_id, log_dir)
+    transfer_worker.workers = max_concurrency
+    transfer_runners = transfer_runner, *_ = list(executor.submit(transfer_worker, transfer_options))
+
+    log.info(f"Transfer phase submitted with LSF ID {transfer_runner.job} and {len(transfer_runners)} workers")
 
 
 _SI  = ["", "k",  "M",  "G",  "T",  "P"]
@@ -200,22 +222,7 @@ def submit(fofn:str, subcollection:str, metadata:str) -> None:
 
     log.info(f"Preparation phase submitted with LSF ID {prep_runner.job}")
 
-    # NOTE We're only dealing with the Lustre-iRODS tuple, so this is
-    # simplified considerably. In a multi-route context, the maximum
-    # concurrency should be a function of the pairwise minimum of
-    # filesystems' maximum concurrencies for each stage of the route.
-    # That function could be, e.g.: max for maximum speed, but also
-    # maximum waste (in terms of redundant workers); min (or some lower
-    # constant) for zero wastage, but longer flight times. The
-    # arithmetic mean would probably be a good thing to go for, without
-    # implementing complicated dynamic load handling...
-    max_concurrency = min(fs.max_concurrency for fs in _FILESYSTEMS)
-
-    transfer_worker, transfer_options = _transfer_worker(job.job_id, log_dir)
-    transfer_worker.workers = max_concurrency
-    transfer_runners = transfer_runner, *_ = list(executor.submit(transfer_worker, transfer_options))
-
-    log.info(f"Transfer phase submitted with LSF ID {transfer_runner.job} and {len(transfer_runners)} workers")
+    _submit_transfer(job, executor)
 
 
 def prepare(job_id:str) -> None:
@@ -259,6 +266,35 @@ def prepare(job_id:str) -> None:
         log.info(f"Added {tasks} tasks to the job")
 
     log.info("Preparation phase complete")
+
+
+def resume(job_id:str, force:T.Optional[str] = None) -> None:
+    """ Resume job """
+    _LOG_HEADER()
+
+    state = _GET_STATE()
+    job = State.Job(state, client_id=_CLIENT, job_id=int(job_id))
+
+    if job.status.phase(_PREPARE).start is None:
+        log.error(f"Preparation phase for job {job_id} has yet to start; cannot resume.")
+        sys.exit(1)
+
+    if job.status.complete:
+        log.info(f"Job {job_id} has already completed.")
+        sys.exit(0)
+
+    if not job.status.phase(_PREPARE).complete:
+        log.warning(f"Preparation phase for job {job_id} is still in progress.")
+        if force != "--force":
+            log.error(f"Cannot resume a job in preparation without the --force option.")
+            sys.exit(1)
+
+    log.info(f"Resuming job {job_id}...")
+
+    resumed = State.Job(state, client_id=_CLIENT, job_id=int(job_id), force_restart=True)
+    executor = _GET_EXECUTOR()
+
+    _submit_transfer(resumed, executor)
 
 
 def transfer(job_id:str) -> None:
