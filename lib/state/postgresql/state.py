@@ -23,14 +23,10 @@ from __future__ import annotations
 
 import importlib.resources as resource
 
-# TODO This is here for the type annotation, but we ought to decouple
-from psycopg2.extensions import cursor
-
 from common import types as T
-from common.logging import log
 from common.models.filesystems.types import BaseFilesystem, Data
 from common.models.task import ExitCode, Task
-from .db import PostgreSQL
+from .db import PostgreSQL, BaseCursor
 from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
                     JobPhase, JobThroughput, DependentTask, DataOrigin, \
                     FORCIBLY_TERMINATED
@@ -384,7 +380,7 @@ class PGJob(BaseJob):
 
         self._job_id = job_id
 
-    def _add_data(self, c:cursor, data:Data, persist_size:bool = False) -> T.Identifier:
+    def _add_data(self, c:BaseCursor, data:Data, persist_size:bool = False) -> T.Identifier:
         # Add data record (filesystem and address) to database
         # FIXME Passing in the cursor here is to maintain the
         # transaction; there's probably a nicer way to do this
@@ -418,7 +414,7 @@ class PGJob(BaseJob):
         return data_id
 
     @staticmethod
-    def _get_target_id(c:cursor, task_id:T.Identifier) -> T.Identifier:
+    def _get_target_id(c:BaseCursor, task_id:T.Identifier) -> T.Identifier:
         # Get the target data identifier for a task
         # FIXME Passing in the cursor here is to maintain the
         # transaction; there's probably a nicer way to do this
