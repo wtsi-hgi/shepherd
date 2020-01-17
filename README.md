@@ -1,7 +1,9 @@
 # shepherd
 
-**Work In Progress: This project is currently under active development
-and not in a released or usable state.**
+**In Hiatus: The development of this project is currently paused; the
+below documentation should be considered mostly aspirational. The
+testing client is operational as a method to copy and validate data from
+POSIX to iRODS, only.**
 
 `shepherd` is a library and CLI tool for copying data between different
 filesystems -- either directly or via any number of intermediary stages,
