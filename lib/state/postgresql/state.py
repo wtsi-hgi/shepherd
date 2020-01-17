@@ -26,7 +26,7 @@ import importlib.resources as resource
 from common import types as T
 from common.models.filesystems.types import BaseFilesystem, Data
 from common.models.task import ExitCode, Task
-from .db import PostgreSQL, BaseCursor
+from .db import PostgreSQL, BaseCursor as Transaction
 from ..types import BasePhaseStatus, BaseJobStatus, BaseAttempt, BaseJob, \
                     JobPhase, JobThroughput, DependentTask, DataOrigin, \
                     FORCIBLY_TERMINATED
@@ -53,8 +53,8 @@ class PGPhaseStatus(BasePhaseStatus):
         self.start = self.finish = None
 
         # Set timestamps from database, if available
-        with state.transaction() as c:
-            c.execute("""
+        with state.transaction() as t:
+            t.execute("""
                 select start,
                        finish
                 from   job_timestamps
@@ -63,7 +63,7 @@ class PGPhaseStatus(BasePhaseStatus):
             """, (job_id, self._phase))
 
             # TODO Py3.8 walrus operator would be good here
-            timestamps = c.fetchone()
+            timestamps = t.fetchone()
             if timestamps is not None:
                 self.start  = timestamps.start
                 self.finish = timestamps.finish
@@ -71,13 +71,13 @@ class PGPhaseStatus(BasePhaseStatus):
     def init(self) -> T.DateTime:
         # Set the start time, if it hasn't been already, and return it
         if self.start is None:
-            with self._state.transaction() as c:
+            with self._state.transaction() as t:
                 # NOTE In the below, the returning clause will only
                 # return if a change was made, thus we forcibly make a
                 # redundant change (rather than "do nothing") on
                 # conflicts. Such a conflict could occur because
                 # multiple workers may try to initialise the phase.
-                c.execute("""
+                t.execute("""
                     insert into job_timestamps (job, phase)
                                         values (%s, %s)
                                    on conflict (job, phase)
@@ -85,7 +85,7 @@ class PGPhaseStatus(BasePhaseStatus):
                                      returning start;
                 """, (self._job_id, self._phase))
 
-                self.start = c.fetchone().start
+                self.start = t.fetchone().start
 
         return self.start
 
@@ -94,10 +94,10 @@ class PGPhaseStatus(BasePhaseStatus):
         if self.start is None:
             raise PeriodNotStarted(f"{self._phase.capitalize()} phase has yet to start")
 
-        with self._state.transaction() as c:
+        with self._state.transaction() as t:
             # NOTE The start time must have been recorded, at this
             # point, so an update will always be possible
-            c.execute("""
+            t.execute("""
                 update    job_timestamps
                 set       finish = coalesce(finish, now())
                 where     job    = %s
@@ -105,7 +105,7 @@ class PGPhaseStatus(BasePhaseStatus):
                 returning finish;
             """, (self._job_id, self._phase))
 
-            self.finish = c.fetchone().finish
+            self.finish = t.fetchone().finish
 
         return self.finish
 
@@ -118,8 +118,8 @@ class PGJobStatus(BaseJobStatus):
         self._state  = state
         self._job_id = job_id
 
-        with state.transaction() as c:
-            c.execute("""
+        with state.transaction() as t:
+            t.execute("""
                 select   sum(pending)   as pending,
                          sum(running)   as running,
                          sum(failed)    as failed,
@@ -129,15 +129,15 @@ class PGJobStatus(BaseJobStatus):
                 group by job;
             """, (job_id,))
 
-            status = c.fetchone()
+            status = t.fetchone()
             self.pending   = status.pending   if status else 0
             self.running   = status.running   if status else 0
             self.failed    = status.failed    if status else 0
             self.succeeded = status.succeeded if status else 0
 
     def throughput(self, source:BaseFilesystem, target:BaseFilesystem) -> JobThroughput:
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 select job_throughput.transfer_rate,
                        job_throughput.failure_rate
                 from   job_throughput
@@ -151,7 +151,7 @@ class PGJobStatus(BaseJobStatus):
             """, (self._job_id, source.name, target.name))
 
             # TODO Py3.8 walrus operator would be good here
-            rates = c.fetchone()
+            rates = t.fetchone()
             if rates is None:
                 raise NoThroughputData(f"Not enough data to calculate throughput rates for job {self._job_id}")
 
@@ -172,8 +172,8 @@ class PGAttempt(BaseAttempt):
         self.start = self.finish = None
 
         # Reconstruct task from persisted data
-        with state.transaction() as c:
-            c.execute("""
+        with state.transaction() as t:
+            t.execute("""
                 select tasks.script,
                        source.id      as source_id,
                        source_fs.name as source_fs,
@@ -199,7 +199,7 @@ class PGAttempt(BaseAttempt):
                 where  attempts.id = %s;
             """, (attempt_id,))
 
-            task = c.fetchone()
+            task = t.fetchone()
 
         self.task = Task(
             script = task.script,
@@ -221,29 +221,29 @@ class PGAttempt(BaseAttempt):
 
     def init(self) -> T.DateTime:
         # FIXME init and stop are very similar
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 update    attempts
                 set       start = coalesce(start, now())
                 where     id = %s
                 returning start;
             """, (self._attempt_id,))
 
-            self.start = c.fetchone().start
+            self.start = t.fetchone().start
 
         return self.start
 
     def stop(self) -> T.DateTime:
         # FIXME init and stop are very similar
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 update    attempts
                 set       finish = coalesce(finish, now())
                 where     id = %s
                 returning finish;
             """, (self._attempt_id,))
 
-            self.finish = c.fetchone().finish
+            self.finish = t.fetchone().finish
 
         return self.finish
 
@@ -251,23 +251,23 @@ class PGAttempt(BaseAttempt):
         # FIXME size and checksum are very similar
         data_id, data = self._origin_id[origin]
 
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 select size
                 from   size
                 where  data = %s;
             """, (data_id,))
 
             # TODO Py3.8 walrus operator would be good here
-            record = c.fetchone()
+            record = t.fetchone()
             if record is None:
-                c.execute("""
+                t.execute("""
                     insert into size (data, size)
                               values (%s, %s)
                            returning size;
                 """, (data_id, data.filesystem.size(data.address)))
 
-                record = c.fetchone()
+                record = t.fetchone()
 
         return record.size
 
@@ -275,8 +275,8 @@ class PGAttempt(BaseAttempt):
         # FIXME size and checksum are very similar
         data_id, data = self._origin_id[origin]
 
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 select checksum
                 from   checksums
                 where  data      = %s
@@ -284,29 +284,29 @@ class PGAttempt(BaseAttempt):
             """, (data_id, algorithm))
 
             # TODO Py3.8 walrus operator would be good here
-            record = c.fetchone()
+            record = t.fetchone()
             if record is None:
-                c.execute("""
+                t.execute("""
                     insert into checksums (data, algorithm, checksum)
                                    values (%s, %s, %s)
                                 returning checksum;
                 """, (data_id, algorithm, data.filesystem.checksum(algorithm, data.address)))
 
-                record = c.fetchone()
+                record = t.fetchone()
 
         return record.checksum
 
     @property
     def exit_code(self) -> ExitCode:
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 select exit_code
                 from   attempts
                 where  id = %s;
             """, (self._attempt_id,))
 
             # TODO Py3.8 walrus operator would be good here
-            exit_code = c.fetchone().exit_code
+            exit_code = t.fetchone().exit_code
             if exit_code is None:
                 raise DataNotReady("Attempt is still in progress")
 
@@ -314,8 +314,8 @@ class PGAttempt(BaseAttempt):
 
     @exit_code.setter
     def exit_code(self, value:ExitCode) -> None:
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 update attempts
                 set    exit_code = %s
                 where  id        = %s;
@@ -340,12 +340,12 @@ class PGJob(BaseJob):
 
         # Check previous job exists under the same client
         if job_id is not None:
-            with state.transaction() as c:
-                c.execute("""
+            with state.transaction() as t:
+                t.execute("""
                     select * from jobs where id = %s and client = %s;
                 """, (job_id, client_id))
 
-                if c.fetchone() is None:
+                if t.fetchone() is None:
                     raise BackendException(f"Job {job_id} does not exist or was started with a different client")
 
         # Reset previously running task status on resumption
@@ -353,8 +353,8 @@ class PGJob(BaseJob):
             if any(self.status.phase(phase) for phase in JobPhase):
                 raise DataNotReady(f"Cannot restart job {job_id}; still in progress")
 
-            with state.transaction() as c:
-                c.execute("""
+            with state.transaction() as t:
+                t.execute("""
                     with previously_running as (
                         select id
                         from   task_status
@@ -369,18 +369,18 @@ class PGJob(BaseJob):
 
         # Create new job
         if job_id is None:
-            with state.transaction() as c:
-                c.execute("""
+            with state.transaction() as t:
+                t.execute("""
                     insert into jobs (client, max_attempts)
                               values (%s, 1)
                            returning id;
                 """, (client_id,))
 
-                job_id = c.fetchone().id
+                job_id = t.fetchone().id
 
         self._job_id = job_id
 
-    def _add_data(self, c:BaseCursor, data:Data, persist_size:bool = False) -> T.Identifier:
+    def _add_data(self, t:Transaction, data:Data, persist_size:bool = False) -> T.Identifier:
         # Add data record (filesystem and address) to database
         # FIXME Passing in the cursor here is to maintain the
         # transaction; there's probably a nicer way to do this
@@ -388,7 +388,7 @@ class PGJob(BaseJob):
         # NOTE In the below, the returning clause will only return if a
         # change was made, thus we forcibly make a redundant change
         # (rather than "do nothing") on conflicts
-        c.execute("""
+        t.execute("""
             insert into filesystems (job, name, max_concurrency)
                              values (%s, %s, %s)
                         on conflict (job, name)
@@ -396,30 +396,30 @@ class PGJob(BaseJob):
                           returning id;
         """, (self._job_id, data.filesystem.name, data.filesystem.max_concurrency))
 
-        filesystem_id = c.fetchone().id
+        filesystem_id = t.fetchone().id
 
-        c.execute("""
+        t.execute("""
             insert into data (filesystem, address)
                       values (%s, %s)
                    returning id;
         """, (filesystem_id, str(data.address)))
 
-        data_id = c.fetchone().id
+        data_id = t.fetchone().id
 
         if persist_size:
             # The root source data size should be persisted
             filesize = data.filesystem.size(data.address)
-            c.execute("insert into size (data, size) values (%s, %s);", (data_id, filesize))
+            t.execute("insert into size (data, size) values (%s, %s);", (data_id, filesize))
 
         return data_id
 
     @staticmethod
-    def _get_target_id(c:BaseCursor, task_id:T.Identifier) -> T.Identifier:
+    def _get_target_id(t:Transaction, task_id:T.Identifier) -> T.Identifier:
         # Get the target data identifier for a task
         # FIXME Passing in the cursor here is to maintain the
         # transaction; there's probably a nicer way to do this
-        c.execute("select target from tasks where id = %s;", (task_id,))
-        return c.fetchone().target
+        t.execute("select target from tasks where id = %s;", (task_id,))
+        return t.fetchone().target
 
     def _add_task_tree(self, task:T.Optional[DependentTask]) -> T.Optional[T.Identifier]:
         if task is None:
@@ -430,7 +430,7 @@ class PGJob(BaseJob):
         root_task = dependency is None
 
         # Add task
-        with self._state.transaction() as c:
+        with self._state.transaction() as t:
             task_values = {
                 "job_id":        self.job_id,
 
@@ -446,21 +446,21 @@ class PGJob(BaseJob):
                 "dependency_id": dependency
             }
 
-            c.execute("""
+            t.execute("""
                 insert into tasks (job, source, target, script, dependency)
                            values (%(job_id)s, %(source_id)s, %(target_id)s, %(script)s, %(dependency_id)s)
                         returning id;
             """, task_values)
 
-            return c.fetchone().id
+            return t.fetchone().id
 
     def __iadd__(self, task:DependentTask) -> PGJob:
         _ = self._add_task_tree(task)
         return self
 
     def attempt(self, time_limit:T.Optional[T.TimeDelta] = None) -> PGAttempt:
-        with self._state.transaction() as c:
-            with c.table_lock("attempts"):
+        with self._state.transaction() as t:
+            with t.table_lock("attempts"):
                 if time_limit is None:
                     query = """
                         select task
@@ -481,37 +481,37 @@ class PGJob(BaseJob):
                     """
                     params = (self.job_id, time_limit)
 
-                c.execute(query, params)
+                t.execute(query, params)
 
                 # TODO Py3.8 walrus operator would be good here
-                todo = c.fetchone()
+                todo = t.fetchone()
                 if todo is None:
                     raise NoTasksAvailable("No tasks are currently available to attempt")
 
                 # Create sentinel attempt record
-                c.execute("""
+                t.execute("""
                     insert into attempts (task)
                                   values (%s)
                                returning id;
                 """, (todo.task,))
 
-                attempt_id = c.fetchone().id
+                attempt_id = t.fetchone().id
 
         return PGAttempt(self._state, attempt_id)
 
     @property
     def max_attempts(self) -> int:
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 select max_attempts from jobs where id = %s;
             """, (self.job_id,))
 
-            return c.fetchone().max_attempts
+            return t.fetchone().max_attempts
 
     @max_attempts.setter
     def max_attempts(self, value:int) -> None:
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 update jobs
                 set    max_attempts = %s
                 where  id           = %s;
@@ -523,17 +523,17 @@ class PGJob(BaseJob):
 
     @property
     def metadata(self) -> T.SimpleNamespace:
-        with self._state.transaction() as c:
-            c.execute("""
+        with self._state.transaction() as t:
+            t.execute("""
                 select key, value from job_metadata where job = %s;
             """, (self.job_id,))
 
-            return T.SimpleNamespace(**{k:v for k, v in c.fetchall() or {}})
+            return T.SimpleNamespace(**{k:v for k, v in t.fetchall() or {}})
 
     def set_metadata(self, **metadata:str) -> None:
-        with self._state.transaction() as c:
+        with self._state.transaction() as t:
             for k, v in metadata.items():
-                c.execute("""
+                t.execute("""
                     insert into job_metadata (job, key, value)
                                       values (%s, %s, %s)
                                  on conflict (job, key)
