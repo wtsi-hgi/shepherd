@@ -1,9 +1,9 @@
 # shepherd
 
 **On Hiatus** The development of this project is currently paused; the
-below documentation should be considered mostly aspirational. The
-"dummy" client is operational as a method to copy and validate data from
-POSIX to iRODS, only.
+below documentation should be considered mostly aspirational and the
+general state is "half-baked". The "dummy" client is operational as a
+method to copy and validate data from POSIX to iRODS, via a FoFN, only.
 
 ---
 
