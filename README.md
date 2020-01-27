@@ -4,6 +4,9 @@
 below documentation should be considered mostly aspirational and the
 general state is "half-baked". The "dummy" client is operational as a
 method to copy and validate data from POSIX to iRODS, via a FoFN, only.
+If you wish to use this client, please consider it an alpha release, at
+best, and familiarise yourself with the current [issues
+list](https://github.com/wtsi-hgi/shepherd/issues).
 
 ---
 
