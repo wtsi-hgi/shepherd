@@ -64,8 +64,8 @@ def _baton(address:T.Path) -> T.SimpleNamespace:
     return T.SimpleNamespace(**decoded)
 
 
-_IRODS_NAME = re.compile(r"(?<=^name: )(?P<name>.+)$", re.MULTILINE)
-_IRODS_ZONE = re.compile(r"(?<=^zone: )(?P<zone>.+)$", re.MULTILINE)
+_IRODS_NAME = re.compile(r"(?<=^NOTICE: irods_user_name - )(?P<name>.+)$", re.MULTILINE)
+_IRODS_ZONE = re.compile(r"(?<=^NOTICE: irods_zone_name - )(?P<zone>.+)$", re.MULTILINE)
 
 @dataclass(init=False)
 class _iRODSUser:
@@ -74,13 +74,13 @@ class _iRODSUser:
     zone:str
 
     def __init__(self) -> None:
-        iuserinfo = subprocess.run("iuserinfo", capture_output=True, check=True, text=True)
+        ienv = subprocess.run("ienv", capture_output=True, check=True, text=True)
 
-        search = _IRODS_NAME.search(iuserinfo.stdout)
+        search = _IRODS_NAME.search(ienv.stdout)
         if search is not None:
             self.name = search["name"]
 
-        search = _IRODS_ZONE.search(iuserinfo.stdout)
+        search = _IRODS_ZONE.search(ienv.stdout)
         if search is not None:
             self.zone = search["zone"]
 
@@ -88,7 +88,7 @@ class _iRODSUser:
 _REQUIREMENTS = [
     ("baton-list",    "baton is not available; see http://wtsi-npg.github.io/baton for details"),
     ("baton-metamod", "baton is not available; see http://wtsi-npg.github.io/baton for details"),
-    ("iuserinfo",     "icommands not found; see https://irods.org/download for details")
+    ("ienv",          "icommands not found; see https://irods.org/download for details")
 ]
 
 # Some iRODS error numbers
