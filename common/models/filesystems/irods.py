@@ -64,8 +64,9 @@ def _baton(address:T.Path) -> T.SimpleNamespace:
     return T.SimpleNamespace(**decoded)
 
 
-_IRODS_NAME = re.compile(r"(?<=^NOTICE: irods_user_name - )(?P<name>.+)$", re.MULTILINE)
-_IRODS_ZONE = re.compile(r"(?<=^NOTICE: irods_zone_name - )(?P<zone>.+)$", re.MULTILINE)
+# FIXME? This seems to break with every new version of iRODS :(
+_IRODS_NAME = re.compile(r"(?<=\birods_user_name - )(?P<name>.+)$", re.MULTILINE)
+_IRODS_ZONE = re.compile(r"(?<=\birods_zone_name - )(?P<zone>.+)$", re.MULTILINE)
 
 @dataclass(init=False)
 class _iRODSUser:
