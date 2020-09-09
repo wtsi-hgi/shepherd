@@ -27,7 +27,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2020-01-13';
+  schema date := timestamp '2020-09-09';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -332,11 +332,11 @@ create or replace view job_throughput as
 
            -- Mean successful task completion rate (bytes/second)
            -- TODO Spread (e.g., standard deviation)?
-           avg(case
+           coalesce(avg(case
              when task_status.succeeded then
                source_size.size / extract(epoch from task_status.finish - task_status.start)
              else null
-           end) as transfer_rate,
+           end), 0) as transfer_rate,
 
            -- Mean attempt failure rate
            -- TODO Spread (e.g., standard deviation)?
