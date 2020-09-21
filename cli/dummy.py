@@ -1,6 +1,5 @@
 """
 Copyright (c) 2019, 2020 Genome Research Limited
-
 Author: Christopher Harrison <ch12@sanger.ac.uk>
 
 This program is free software: you can redistribute it and/or modify it
@@ -75,6 +74,8 @@ _TRANSFER = JobPhase.Transfer
 def main(*args:str) -> None:
     # Expected environment variables (commented out entries are
     # optional, listed for documentation's sake)
+    log.to_tty()
+    log.critical("Called main")
     envvars = {
         "PG_HOST":        "PostgreSQL hostname",
         # "PG_PORT":      "PostgreSQL port [5432]",
@@ -245,8 +246,14 @@ def prepare(job_id:str) -> None:
 
         # Setup the transfer route
         route = posix_to_irods_factory(*_FILESYSTEMS)
-        route += strip_common_prefix
+        # route += strip_common_prefix
+        # /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV to PREFIX/PROJECT/decode(ENCODED_PATH)
+        route += strip_common_prefix_excluding_project
         route += prefix(irods_base / subcollection)
+        
+        # route += add_volume_name
+        # route += add_archive_date
+        route += add_decoded_filename
         route += debugging
         route += telemetry
 
