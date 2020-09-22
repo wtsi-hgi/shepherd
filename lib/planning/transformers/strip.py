@@ -74,7 +74,8 @@ def _strip_common_prefix_excluding_project(io:IOGenerator) -> IOGenerator:
 
         yield source, new_target
 
-strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
+
+strip_common_prefix_excluding_project = RouteIOTransformation(_strip_common_prefix_excluding_project)
 
 
 def add_decoded_filename(source: str):

@@ -250,7 +250,7 @@ def prepare(job_id:str) -> None:
         route += prefix(irods_base / subcollection)
         # route += add_volume_name
         # route += add_archive_date
-        route += add_decoded_filename
+        # route += add_decoded_filename
         route += debugging
         route += telemetry
 
