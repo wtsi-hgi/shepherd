@@ -32,7 +32,7 @@ from lib.execution import types as Exec
 from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.execution.lsf.context import LSFWorkerLimit
 from lib.planning.route_factories import posix_to_irods_factory
-from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging
+from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging, strip_common_prefix_excluding_project, add_decoded_filename 
 from lib.state import postgresql as State
 from lib.state.exceptions import DataException, NoThroughputData, NoTasksAvailable
 from lib.state.types import BasePhaseStatus, JobPhase, DependentTask, DataOrigin
@@ -74,8 +74,6 @@ _TRANSFER = JobPhase.Transfer
 def main(*args:str) -> None:
     # Expected environment variables (commented out entries are
     # optional, listed for documentation's sake)
-    log.to_tty()
-    log.critical("Called main")
     envvars = {
         "PG_HOST":        "PostgreSQL hostname",
         # "PG_PORT":      "PostgreSQL port [5432]",
@@ -250,7 +248,6 @@ def prepare(job_id:str) -> None:
         # /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV to PREFIX/PROJECT/decode(ENCODED_PATH)
         route += strip_common_prefix_excluding_project
         route += prefix(irods_base / subcollection)
-        
         # route += add_volume_name
         # route += add_archive_date
         route += add_decoded_filename

@@ -77,6 +77,10 @@ def _strip_common_prefix_excluding_project(io:IOGenerator) -> IOGenerator:
 strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
 
+def add_decoded_filename(source: str):
+   pass
+
+
 def _find_project_name(source: str):
    end_index =  source.find("/.vault") - 1
    start_index = source.rfind("/", 0 , end_index) + 1
