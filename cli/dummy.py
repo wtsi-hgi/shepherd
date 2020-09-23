@@ -246,7 +246,7 @@ def prepare(job_id:str) -> None:
         route = posix_to_irods_factory(*_FILESYSTEMS)
         # route += strip_common_prefix
         route += vault_transformer
-        route += prefix(irods_base / subcollection)
+        route += prefix(irods_base)
         route += debugging
         route += telemetry
 
