@@ -27,7 +27,7 @@ begin transaction;
 
 -- Schema versioning
 do $$ declare
-  schema date := timestamp '2020-09-09';
+  schema date := timestamp '2020-09-23';
   actual date;
 begin
   create table if not exists __version__ (version date primary key);
@@ -333,7 +333,7 @@ create or replace view job_throughput as
            -- Mean successful task completion rate (bytes/second)
            -- TODO Spread (e.g., standard deviation)?
            coalesce(avg(case
-             when task_status.succeeded then
+             when task_status.succeeded and task_status.start != task_status.finish then
                source_size.size / extract(epoch from task_status.finish - task_status.start)
              else null
            end), 0) as transfer_rate,
@@ -466,8 +466,11 @@ create or replace view todo as
   select    jobs.id  as job,   -- Job ID
             tasks.id as task,  -- Task ID
 
-            -- Estimated time to completion (interval)
-            make_interval(secs => source_size.size / (stats.transfer_rate * (1 - stats.failure_rate))) as eta
+            -- Estimated time to completion (interval or NULL)
+            case
+              when stats.transfer_rate = 0 or stats.failure_rate = 1 then null
+              else make_interval(secs => source_size.size / (stats.transfer_rate * (1 - stats.failure_rate)))
+            end as eta
 
   from      task_status
   join      tasks
