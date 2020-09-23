@@ -81,15 +81,14 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
         # We calculate the common prefix one location at a time, because
         # os.path.commonpath otherwise eats a lot of memory
         _project = _find_project_name(str(source.address))
-        _decoded_relative_path = _find_decoded_relative_path(source.address)
-        _buffer.append((source, target, _project, _decoded_relative_path))
-        _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
-
-    for source, target, project, relative_path in _buffer:
+        _decoded_vault_relative_path = _find_decoded_relative_path(source.address)
+        _buffer.append((source, target, _project, _decoded_vault_relative_path))
+        # _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
+    for source, target, project, vault_relative_path in _buffer:
         new_target = Data(
             filesystem = target.filesystem,
-            address    = _ROOT / project / relative_path)
-
+            address    = _ROOT / project / vault_relative_path)
+        #print(f"New Target: {new_target}")
         yield source, new_target
 
 
@@ -118,21 +117,4 @@ def last_n_components(n:int) -> RouteIOTransformation:
     return RouteIOTransformation(_last_n)
 
 
-
-
-
-def test_vault_transformer():
-    test_case = [
-        (Data(filesystem = "abc", address = T.Path("/path/to/my-project/.vault/.staged/01/23/45/67/89/ab-cGF0aC90by9zb21lL2ZpbGU=")), Data(filesystem ="xyz", address = T.Path("/path/to/my-project/.vault/.staged/01/23/45/67/89/ab-cGF0aC90by9zb21lL2ZpbGU="))
-    ),
-        (Data(filesystem = "abc", address = T.Path("/path/xyz/my-project/.vault/.staged/01/23/45/67/89/ab-cGF0aC90by9zb21lL2ZpbGU=")), Data(filesystem ="xyz", address = T.Path("/path/xyz/my-project/.vault/.staged/01/23/45/67/89/ab-cGF0aC90by9zb21lL2ZpbGU=")))
-    ]
-
-    transformed_io = vault_transformer(test_case)
-    for source, target in transformed_io:
-        print(f"Source: {source}, target: {target}")
-
-
-if __name__ == "__main__":
-    test_vault_transformer()
 
