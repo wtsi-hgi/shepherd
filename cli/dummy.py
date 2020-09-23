@@ -32,7 +32,7 @@ from lib.execution import types as Exec
 from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.execution.lsf.context import LSFWorkerLimit
 from lib.planning.route_factories import posix_to_irods_factory
-from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging, strip_common_prefix_excluding_project, add_decoded_filename 
+from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging, vault_transformer
 from lib.state import postgresql as State
 from lib.state.exceptions import DataException, NoThroughputData, NoTasksAvailable
 from lib.state.types import BasePhaseStatus, JobPhase, DependentTask, DataOrigin
@@ -245,12 +245,8 @@ def prepare(job_id:str) -> None:
         # Setup the transfer route
         route = posix_to_irods_factory(*_FILESYSTEMS)
         # route += strip_common_prefix
-        # /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV to PREFIX/PROJECT/decode(ENCODED_PATH)
-        route += strip_common_prefix_excluding_project
+        route += vault_transformer
         route += prefix(irods_base / subcollection)
-        # route += add_volume_name
-        # route += add_archive_date
-        # route += add_decoded_filename
         route += debugging
         route += telemetry
 
