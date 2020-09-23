@@ -396,6 +396,10 @@ def transfer(job_id:str) -> None:
                     **metadata,
                     "source": str(attempt.task.source.address)
                 })
+            log.info(f"Removing original file from {attempt.task.source.address}")
+            os.remove(attempt.task.source.address)
+
+
 
 
 def _phase_status(phase:BasePhaseStatus) -> str:
