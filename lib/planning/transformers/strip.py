@@ -72,7 +72,7 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
     def _find_volume_name(source: T.Path):
         '''Extracts the project name from the given vault file path by scanning for parent of .vault directory. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return my-project'''
         source = str(source)
-        pattern = re.compile("/scratch[0-9]+")
+        pattern = re.compile("scratch[0-9]+")
         result = re.findall(pattern, source)
         if len(result):
             log.debug(f"Volume found in source {source}: {result}")
@@ -120,9 +120,12 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
         _buffer.append((source, target, _volume, _project, _decoded_vault_relative_path))
         # _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
     for source, target, volume, project, vault_relative_path in _buffer:
+        log.debug(f"Source: {source.address} Target: {target.address} project: {project}, volume: {volume}, relative path: {vault_relative_path}") 
+        address    = _ROOT /  project / volume / vault_relative_path
+        log.debug(f"Final Address: {address}")
         new_target = Data(
             filesystem = target.filesystem,
-            address    = _ROOT /  project / volume / vault_relative_path)
+            address    = address)
        
         yield source, new_target
 
