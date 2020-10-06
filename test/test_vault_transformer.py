@@ -25,8 +25,8 @@ vault_filepath_3 = Path("/Users/pa11/Code/shepherd-testing/shepherd/.vault/.stag
 
 test_case = [
 
-    (Data(filesystem = "abc", address = vault_filepath_3),
-     Data(filesystem ="xyz", address = vault_filepath_3)),
+    (Data(filesystem = "abc", address = vault_filepath_1),
+     Data(filesystem ="xyz", address = vault_filepath_1)),
 
     (Data(filesystem = "abc", address = vault_filepath_3),
      Data(filesystem ="xyz", address = vault_filepath_3))

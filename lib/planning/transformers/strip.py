@@ -20,6 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 from os.path import commonpath
 import json
 import base64 
+import re
 
 from common import types as T
 from common.logging import log
@@ -68,6 +69,18 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
     #     project_name = source[start_index: end_index ]
     #     return project_name
 
+    def _find_volume_name(source: T.Path):
+        '''Extracts the project name from the given vault file path by scanning for parent of .vault directory. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return my-project'''
+        source = str(source)
+        pattern = re.compile("/scratch[0-9]+")
+        result = re.findall(pattern, source)
+        if len(result):
+            log.debug(f"Volume found in source {source}: {result}")
+            return result[0]
+        else:
+            log.critical(f"Source {source} does not have any scratch disks in its path!")
+            return "."
+
     def _find_project_group(source: T.Path) -> str:
         '''Extracts the project name from the given vault file path by scanning for parent of .vault directory. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return my-project'''
         source = str(source)
@@ -100,16 +113,16 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
             group_mapping = json.load(json_file)
         _group = _find_project_group(source.address) 
         _project = group_mapping.get(_group, _group)
-
         log.debug(f"Source: {source.address} Group:{_group} Project:{_project}")
 
+        _volume = _find_volume_name(source.address)
         _decoded_vault_relative_path = _find_decoded_relative_path(source.address)
-        _buffer.append((source, target, _project, _decoded_vault_relative_path))
+        _buffer.append((source, target, _volume, _project, _decoded_vault_relative_path))
         # _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
-    for source, target, project, vault_relative_path in _buffer:
+    for source, target, volume, project, vault_relative_path in _buffer:
         new_target = Data(
             filesystem = target.filesystem,
-            address    = _ROOT / project / vault_relative_path)
+            address    = _ROOT / volume / project / vault_relative_path)
        
         yield source, new_target
 
