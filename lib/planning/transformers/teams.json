@@ -1,4 +1,5 @@
 {
+    "cramtastic": "vault_test",
     "staff": "local_test",
     "team151": "saranzo",
     "team29": "hurles",
@@ -24,7 +25,8 @@
     "team152_bce":  "team152_bce",    
     "team135":  "team135",  
     "gains_team282":"gains_team282",    
-    "ukbb_team152": "ukbb_team152" 
+    "ukbb_team152": "ukbb_team152",
+
 }     
 
 

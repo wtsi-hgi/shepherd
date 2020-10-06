@@ -122,7 +122,7 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
     for source, target, volume, project, vault_relative_path in _buffer:
         new_target = Data(
             filesystem = target.filesystem,
-            address    = _ROOT / volume / project / vault_relative_path)
+            address    = _ROOT /  project / volume / vault_relative_path)
        
         yield source, new_target
 
