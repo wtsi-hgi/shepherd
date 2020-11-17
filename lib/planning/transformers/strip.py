@@ -59,16 +59,6 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
     _buffer:T.List[T.Tuple[Data, Data, Data]] = []
     _prefix:T.Optional[Data] = None
 
-    # def _find_project_name(source: T.Path):
-    #     '''Extracts the project name from the given vault file path by scanning for parent of .vault directory. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return my-project'''
-    #     source = str(source)
-    #     end_index =  source.find("/.vault")
-    #     start_index = source.rfind("/", 0 , end_index) + 1
-    #     if end_index == -1 or start_index == 0:
-    #         log.critical(f"Given source path {source} does not seem to be a valid vault file path")
-    #     project_name = source[start_index: end_index ]
-    #     return project_name
-
     def _find_volume_name(source: T.Path):
         '''Extracts the project name from the given vault file path by scanning for parent of .vault directory. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return my-project'''
         source = str(source)
@@ -82,7 +72,7 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
             return "."
 
     def _find_project_group(source: T.Path) -> str:
-        '''Extracts the project name from the given vault file path by scanning for parent of .vault directory. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return my-project'''
+        '''Extracts the unix group of the project. E.g.: /path/to/my-project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4 should return the unix group that owns my-project'''
         source = str(source)
         end_index =  source.find("/.vault")
         if end_index == -1:
