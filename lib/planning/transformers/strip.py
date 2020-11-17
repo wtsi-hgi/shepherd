@@ -55,7 +55,7 @@ strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
 
 def _vault_transformer(io:IOGenerator) -> IOGenerator:
-    """ Strip the common prefix from all target locations """
+    """ Transformer for vault."""
     _buffer:T.List[T.Tuple[Data, Data, Data]] = []
     _prefix:T.Optional[Data] = None
 
@@ -103,16 +103,13 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
             group_mapping = json.load(json_file)
         _group = _find_project_group(source.address) 
         _project = group_mapping.get(_group, _group)
-        log.debug(f"Source: {source.address} Group:{_group} Project:{_project}")
-
         _volume = _find_volume_name(source.address)
         _decoded_vault_relative_path = _find_decoded_relative_path(source.address)
         _buffer.append((source, target, _volume, _project, _decoded_vault_relative_path))
         # _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
     for source, target, volume, project, vault_relative_path in _buffer:
-        log.debug(f"Source: {source.address} Target: {target.address} project: {project}, volume: {volume}, relative path: {vault_relative_path}") 
         address    = _ROOT /  project / volume / vault_relative_path
-        log.debug(f"Final Address: {address}")
+        log.debug(f"Transforming Route. Source: {source.address} Target: {target.address} project: {project}, volume: {volume}, relative path: {vault_relative_path} Final Address: {address}") 
         new_target = Data(
             filesystem = target.filesystem,
             address    = address)
@@ -128,7 +125,6 @@ def last_n_components(n:int) -> RouteIOTransformation:
     """
     Route IO transformation factory that takes, at most, the last n
     components from the target location
-
     @param   n  Number of components
     @return  IO transformer
     """
