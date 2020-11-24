@@ -1,16 +1,17 @@
 
 import unittest
+import sys
 
 from pathlib import Path
-from common.models.filesystems.types import Data
-from lib.planning.transformers import strip_common_prefix, prefix, vault_transformer
+# from common.models.filesystems.types import Data
+# from lib.planning.transformers import strip_common_prefix, prefix, vault_transformer
 
 import grp
 import pwd
 import os
 
 
-
+print(f"Sys path {sys.path}")
 filepath_1 = Path("/lustre/scratch115/my-project/path/to/some/file")
 vault_filepath_1 = Path("/lustre/scratch115/my-project/.vault/.staged/01/23/ab-cGF0aC90by9zb21lL2ZpbGU=")
 
@@ -35,8 +36,11 @@ test_case = [
 
 
 class TestVaultTransformer(unittest.TestCase):
-
     def test_vault_transformer(self):
         transformed_io = vault_transformer(test_case)
         for source, target in transformed_io:
             print(f"source: {source.address}, target: {target.address}")
+
+
+if __name__ == "__main__":
+    unittest.main()
