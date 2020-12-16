@@ -32,7 +32,7 @@ from lib.execution import types as Exec
 from lib.execution.lsf import LSF, LSFSubmissionOptions
 from lib.execution.lsf.context import LSFWorkerLimit
 from lib.planning.route_factories import posix_to_irods_factory
-from lib.planning.transformers import strip_common_prefix, prefix, telemetry, debugging, vault_transformer
+from lib.planning.transformers import telemetry, debugging, vault_transformer
 from lib.state import postgresql as State
 from lib.state.exceptions import DataException, NoThroughputData, NoTasksAvailable
 from lib.state.types import BasePhaseStatus, JobPhase, DependentTask, DataOrigin
@@ -83,8 +83,7 @@ def main(*args:str) -> None:
         "LSF_CONFIG":     "Path to LSF cluster configuration directory",
         "LSF_GROUP":      "LSF Fairshare group to run under",
         "PREP_QUEUE":     "LSF queue to use for the preparation phase",
-        "TRANSFER_QUEUE": "LSF queue to use for the transfer phase",
-        "IRODS_BASE":     "Base iRODS collection into which to transfer"
+        "TRANSFER_QUEUE": "LSF queue to use for the transfer phase"
         # "MAX_ATTEMPTS": "Maximum attempts per transfer task [3]"
         # "SHEPHERD_LOG": "Logging directory [pwd]"
         # "DAISYCHAIN":   "Automatically daisychain transfer workers [Yes]"
@@ -186,19 +185,17 @@ def submit(fofn:str, subcollection:str, metadata:str) -> None:
     log.to_file(log_dir / "submit.log")
 
     fofn_path = T.Path(fofn).resolve()
-    irods_base = os.environ["IRODS_BASE"]
     metadata_path = T.Path(metadata).resolve()
 
     _LOG_HEADER()
     log.info(f"Logging to {log_dir}")
-    log.info(f"Will transfer contents of {fofn_path} to {irods_base}/{subcollection}")
+    log.info(f"Will transfer contents of {fofn_path} to /humgen")
     log.info(f"Will apply metadata from {metadata_path} to each file")
 
     state = _GET_STATE()
     job = State.Job(state, client_id=_CLIENT)
     job.max_attempts = max_attempts = int(os.getenv("MAX_ATTEMPTS", "3"))
     job.set_metadata(fofn            = str(fofn_path),
-                     irods_base      = irods_base,
                      subcollection   = subcollection,
                      logs            = str(log_dir),
                      shitty_metadata = str(metadata_path),
@@ -233,7 +230,6 @@ def prepare(job_id:str) -> None:
 
     # Get the FoFN path and prefix from the client metadata
     fofn = T.Path(job.metadata.fofn)
-    irods_base = T.Path(job.metadata.irods_base)
     subcollection = job.metadata.subcollection
 
     if job.status.phase(_PREPARE).start is not None:
@@ -244,9 +240,7 @@ def prepare(job_id:str) -> None:
 
         # Setup the transfer route
         route = posix_to_irods_factory(*_FILESYSTEMS)
-        # route += strip_common_prefix
         route += vault_transformer
-        route += prefix(irods_base)
         route += debugging
         route += telemetry
 
