@@ -1,7 +1,9 @@
 """
 Copyright (c) 2019 Genome Research Limited
 
-Author: Christopher Harrison <ch12@sanger.ac.uk>
+Authors:
+* Christopher Harrison <ch12@sanger.ac.uk>
+* Piyush Ahuja <pa11@sanger.ac.uk>
 
 This program is free software: you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -17,10 +19,10 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
-from os.path import commonpath
+import base64
 import json
-import base64 
 import re
+from os.path import commonpath
 
 from common import types as T
 from common.logging import log
@@ -36,7 +38,6 @@ def _strip_common_prefix(io:IOGenerator) -> IOGenerator:
     _buffer:T.List[T.Tuple[Data, Data]] = []
     _prefix:T.Optional[Data] = None
 
-
     for source, target in io:
         # We calculate the common prefix one location at a time, because
         # os.path.commonpath otherwise eats a lot of memory
@@ -49,7 +50,6 @@ def _strip_common_prefix(io:IOGenerator) -> IOGenerator:
             address    = _ROOT / target.address.relative_to(_prefix))
 
         yield source, new_target
-
 
 strip_common_prefix = RouteIOTransformation(_strip_common_prefix)
 
@@ -85,7 +85,6 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
         else:
             raise Exception(f"Project Prefix Path {project_prefix} not found")
 
-
     def _find_decoded_relative_path(source: T.Path) -> str:
         '''Extracts the base 64 decoded file path'''
         source = str(source)
@@ -95,13 +94,13 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
         b64encoded_path = source[start_index:]
         b64decoded_path = base64.b64decode(b64encoded_path)
         return b64decoded_path.decode("utf-8")
-    
-    for source, target in io:  
+
+    for source, target in io:
         group_mapping = {}
         script_dir = T.Path(__file__).parent
         with open(script_dir/ 'teams.json', 'r') as json_file:
             group_mapping = json.load(json_file)
-        _group = _find_project_group(source.address) 
+        _group = _find_project_group(source.address)
         _project = group_mapping.get(_group, _group)
         _volume = _find_volume_name(source.address)
         _decoded_vault_relative_path = _find_decoded_relative_path(source.address)
@@ -109,22 +108,21 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
         # _prefix = T.Path(commonpath((_prefix or target.address, target.address)))
     for source, target, volume, project, vault_relative_path in _buffer:
         address    = _ROOT /  project / volume / vault_relative_path
-        log.debug(f"Transforming Route. Source: {source.address} Target: {target.address} project: {project}, volume: {volume}, relative path: {vault_relative_path} Final Address: {address}") 
+        log.debug(f"Transforming Route. Source: {source.address} Target: {target.address} project: {project}, volume: {volume}, relative path: {vault_relative_path} Final Address: {address}")
         new_target = Data(
             filesystem = target.filesystem,
             address    = address)
-       
+
         yield source, new_target
 
-
 vault_transformer = RouteIOTransformation(_vault_transformer)
-
 
 
 def last_n_components(n:int) -> RouteIOTransformation:
     """
     Route IO transformation factory that takes, at most, the last n
     components from the target location
+
     @param   n  Number of components
     @return  IO transformer
     """
@@ -139,6 +137,3 @@ def last_n_components(n:int) -> RouteIOTransformation:
             yield source, new_target
 
     return RouteIOTransformation(_last_n)
-
-
-
