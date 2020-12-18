@@ -58,8 +58,11 @@ from ..types import RouteIOTransformation, IOGenerator
 # parts. However, the Lustre volume is always the second level from the
 # root, so it's trivial to extract.
 
+# FIXME Hardcode our iRODS root
 _HUMGEN = T.Path("/humgen")
 
+# FIXME teams.json should not be checked in; this is just a hack to make
+# it work for now
 _TEAM_MAPPING = json.loads(
     resource.read_text("lib.planning.transformers", "teams.json"))
 
@@ -70,10 +73,10 @@ _VAULT_PATH = re.compile(r"""
     (?P<type> [^/]+ )/            # The 'type' directory
     (?P<group> [^/]+ )            # The group directory
   )/
-  \.vault/[^/]+                   # The vault directory
+  \.vault/[^/]+                   # The vault and branch directory
   (?:/[0-9a-f]{2})*/[0-9a-f]{2}   # The encoded inode
   -                               # Delimiter
-  (?P<path>[a-zA-Z0-9+_]+={0,2})  # The base64 encoded path
+  (?P<path>[a-zA-Z0-9+_]+={0,2})  # The base64(ish) encoded path
   $                               # End of string
 """, re.VERBOSE)
 
