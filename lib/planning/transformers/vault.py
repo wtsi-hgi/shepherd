@@ -67,17 +67,17 @@ _TEAM_MAPPING = json.loads(
     resource.read_text("lib.planning.transformers", "teams.json"))
 
 _VAULT_PATH = re.compile(r"""
-  ^                               # Start of string
-  (?P<prefix>                     # Full group directory
+  (?<= ^/lustre/scratch )          # Start with /lustre/scratch
+  (?P<prefix>                      # Full group directory
     .*?/
-    (?P<type> [^/]+ )/            # The 'type' directory
-    (?P<group> [^/]+ )            # The group directory
+    (?P<type> [^/]+ )/             # The 'type' directory
+    (?P<group> [^/]+ )             # The group directory
   )/
-  \.vault/[^/]+                   # The vault and branch directory
-  (?:/[0-9a-f]{2})*/[0-9a-f]{2}   # The encoded inode
-  -                               # Delimiter
-  (?P<path>[a-zA-Z0-9+_]+={0,2})  # The base64(ish) encoded path
-  $                               # End of string
+  \.vault/[^/]+                    # The vault and branch directories
+  (?:/[0-9a-f]{2})*/[0-9a-f]{2}    # The encoded inode
+  -                                # Delimiter
+  (?P<path> [a-zA-Z0-9+_]+={0,2})  # The base64(ish) encoded path
+  $                                # End of string
 """, re.VERBOSE)
 
 def _decode(encoded:str) -> str:
