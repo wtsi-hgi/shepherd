@@ -29,36 +29,9 @@ from common.logging import log
 from common.models.filesystems.types import Data
 from ..types import RouteIOTransformation, IOGenerator
 
-# Vault paths can take six forms:
-#
-# Project Directory
-#   /lustre/scratch101/projects/my_project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4
-#   /lustre/scratch101/realdata/mdt0/projects/my_project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4
-#
-# Team Directory
-#   /lustre/scratch101/teams/my_team/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4
-#   /lustre/scratch101/realdata/mdt0/teams/my_team/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4
-#
-# HGI Team Directory (special case)
-#   /lustre/scratch101/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4
-#   /lustre/scratch101/realdata/mdt0/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4
-#
-# We are interested in:
-# 1. The base64 encoded path, at the end (n.b., This uses a non-standard
-#    base64 alphabet, replacing the usual "/" character with an "_")
-# 2. The group, which is the group owner of the directory immediately
-#    above the .vault directory (appropriately mapped)
-# 3. Whether this is a project or team directory, which can be deduced
-#    by the directory immediately above the group directory
-# 4. The Lustre volume, which is the directory immediately after /lustre
-#
-# Note that, because of the special case of the HGI team directory on a
-# Lustre volume with a single MDT (i.e., group and Lustre volume are the
-# same), we can't use a single regular expression to factor out the
-# parts. However, the Lustre volume is always the second level from the
-# root, so it's trivial to extract.
 
-# FIXME Hardcode our iRODS root
+# FIXME Hardcode our Lustre and iRODS roots
+_LUSTRE = "/lustre/scratch"
 _HUMGEN = T.Path("/humgen")
 
 # FIXME teams.json should not be checked in; this is just a hack to make
@@ -67,26 +40,29 @@ _TEAM_MAPPING = json.loads(
     resource.read_text("lib.planning.transformers", "teams.json"))
 
 _VAULT_PATH = re.compile(r"""
-  (?<= ^/lustre/scratch )          # Start with /lustre/scratch
-  (?P<prefix>                      # Full group directory
+  ^                                  # Start of string
+  (?P<prefix>                        # Full group directory
     .*?/
-    (?P<type> [^/]+ )/             # The 'type' directory
-    (?P<group> [^/]+ )             # The group directory
+    (?P<type> [^/]+ )/               # The 'type' directory
+    (?P<group> [^/]+ )               # The group directory
   )/
-  \.vault/[^/]+                    # The vault and branch directories
-  (?:/[0-9a-f]{2})*/[0-9a-f]{2}    # The encoded inode
-  -                                # Delimiter
-  (?P<path> [a-zA-Z0-9+_]+={0,2})  # The base64(ish) encoded path
-  $                                # End of string
+  \.vault/                           # The vault directory
+  (?P<vault> \.stashed | \.staged )  # The vault branch directory
+  (?:/[0-9a-f]{2})*/[0-9a-f]{2}      # The encoded inode
+  -                                  # Delimiter
+  (?P<path> [a-zA-Z0-9+_]+={0,2})    # The base64(ish) encoded path
+  $                                  # End of string
 """, re.VERBOSE)
 
 def _decode(encoded:str) -> str:
+    # NOTE We are using a non-standard base64 alphabet
     return base64.b64decode(encoded, altchars=b"+_").decode()
 
 def _vault_transformer(io:IOGenerator) -> IOGenerator:
     for source, target in io:
         match = _VAULT_PATH.match(str(source.address))
-        if match:
+        # FIXME Can the regex ensure we start with "/lustre/scratch"?
+        if str(source.address).startswith(_LUSTRE) and match:
             # The group type is either "projects" or "teams"
             group_type = "projects" if match["type"] == "projects" else "teams"
 
@@ -102,7 +78,12 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
             # We finally just need to decode the path
             decoded_path = _decode(match["path"])
 
-            canonical_path = _HUMGEN / group_type / group / lustre / decoded_path
+            # FIXME This could probably be a bit nicer
+            if match["vault"] == ".stashed":
+                canonical_path = _HUMGEN / group_type / group / "stashed" / lustre / decoded_path
+            else:
+                canonical_path = _HUMGEN / group_type / group / lustre / decoded_path
+
             log.debug(f"Vault address {source.address} maps to {canonical_path}")
             yield source, Data(
                 filesystem = target.filesystem,

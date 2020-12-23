@@ -20,6 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 import unittest
+from itertools import zip_longest
 from unittest.mock import MagicMock, patch
 
 from common import types as T
@@ -38,23 +39,41 @@ def _make_data(address:T.Path) -> T.Tuple[Data, Data]:
 
 
 _CASES = [
-    # Projects
+    # Projects; Archive
     _make_case("/lustre/scratch101/projects/my_project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
                "my_project", "/humgen/projects/my_project/scratch101/foo/bar/quux"),
     _make_case("/lustre/scratch101/realdata/mdt0/projects/my_project/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
                "my_project", "/humgen/projects/my_project/scratch101/foo/bar/quux"),
 
-    # Teams
+    # Projects; Stash
+    _make_case("/lustre/scratch101/projects/my_project/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
+               "my_project", "/humgen/projects/my_project/stashed/scratch101/foo/bar/quux"),
+    _make_case("/lustre/scratch101/realdata/mdt0/projects/my_project/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
+               "my_project", "/humgen/projects/my_project/stashed/scratch101/foo/bar/quux"),
+
+    # Teams; Archive
     _make_case("/lustre/scratch101/teams/my_team/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
                "my_team", "/humgen/teams/my_team/scratch101/foo/bar/quux"),
     _make_case("/lustre/scratch101/realdata/mdt0/teams/my_team/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
                "my_team", "/humgen/teams/my_team/scratch101/foo/bar/quux"),
 
-    # HGI Team (special case)
+    # Teams; Stash
+    _make_case("/lustre/scratch101/teams/my_team/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
+               "my_team", "/humgen/teams/my_team/stashed/scratch101/foo/bar/quux"),
+    _make_case("/lustre/scratch101/realdata/mdt0/teams/my_team/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
+               "my_team", "/humgen/teams/my_team/stashed/scratch101/foo/bar/quux"),
+
+    # HGI Team (special case); Archive
     _make_case("/lustre/scratch101/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
                "hgi", "/humgen/teams/hgi/scratch101/foo/bar/quux"),
     _make_case("/lustre/scratch101/realdata/mdt0/.vault/.staged/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
-               "hgi", "/humgen/teams/hgi/scratch101/foo/bar/quux")
+               "hgi", "/humgen/teams/hgi/scratch101/foo/bar/quux"),
+
+    # HGI Team (special case); Stash
+    _make_case("/lustre/scratch101/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
+               "hgi", "/humgen/teams/hgi/stashed/scratch101/foo/bar/quux"),
+    _make_case("/lustre/scratch101/realdata/mdt0/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
+               "hgi", "/humgen/teams/hgi/stashed/scratch101/foo/bar/quux")
 ]
 
 _EXPECTED = (expected for _, _, expected in _CASES)
@@ -69,7 +88,14 @@ class TestVaultTransformer(unittest.TestCase):
                     mock_group.return_value = group
                     yield _make_data(source)
 
-        for (_, target), expected in zip(_vault_transformer(io()), _EXPECTED):
+        for transformed, expected in zip_longest(_vault_transformer(io()), _EXPECTED):
+            # _vault_transformer(io()) and _EXPECTED should have the
+            # same length; if not, something has gone wrong
+            self.assertIsNotNone(transformed, msg="Transformer generates fewer values than expected")
+            self.assertIsNotNone(expected, msg="Transformer generates more values than expected")
+
+            # Otherwise, unpack and check we got what we expect
+            _, target = transformed
             self.assertEqual(target.address, expected)
 
     def test_failure(self):
