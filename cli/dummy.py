@@ -391,7 +391,10 @@ def transfer(job_id:str) -> None:
                     "source": str(attempt.task.source.address)
                 })
             log.info(f"Removing original file from {attempt.task.source.address}")
-            os.remove(attempt.task.source.address)
+            try:
+                os.remove(attempt.task.source.address)
+            except Exception as e:
+                log.warning(f"Deletion failed for source file: {attempt.task.source.address}. {e}")
 
 
 
