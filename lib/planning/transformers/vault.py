@@ -1,9 +1,10 @@
 """
-Copyright (c) 2020 Genome Research Limited
+Copyright (c) 2020, 2021 Genome Research Limited
 
 Authors:
 * Christopher Harrison <ch12@sanger.ac.uk>
 * Piyush Ahuja <pa11@sanger.ac.uk>
+* Michael Grace <mg38@sanger.ac.uk>
 
 This program is free software: you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -50,7 +51,7 @@ _VAULT_PATH = re.compile(r"""
   (?P<vault> \.stashed | \.staged )  # The vault branch directory
   (?:/[0-9a-f]{2})*/[0-9a-f]{2}      # The encoded inode
   -                                  # Delimiter
-  (?P<path> [a-zA-Z0-9+_]+={0,2})    # The base64(ish) encoded path
+  (?P<path> [a-zA-Z0-9+_/]+={0,2})    # The base64(ish) encoded path
   $                                  # End of string
 """, re.VERBOSE)
 
@@ -76,7 +77,7 @@ def _vault_transformer(io:IOGenerator) -> IOGenerator:
             lustre = source.address.parts[2]
 
             # We finally just need to decode the path
-            decoded_path = _decode(match["path"])
+            decoded_path = _decode(match["path"].replace("/", ""))
 
             # FIXME This could probably be a bit nicer
             if match["vault"] == ".stashed":
