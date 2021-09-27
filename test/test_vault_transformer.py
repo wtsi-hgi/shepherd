@@ -1,9 +1,10 @@
 """
-Copyright (c) 2020 Genome Research Limited
+Copyright (c) 2020, 2021 Genome Research Limited
 
 Authors:
 * Christopher Harrison <ch12@sanger.ac.uk>
 * Piyush Ahuja <pa11@sanger.ac.uk>
+* Michael Grace <mg38@sanger.ac.uk>
 
 This program is free software: you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -73,7 +74,13 @@ _CASES = [
     _make_case("/lustre/scratch101/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
                "hgi", "/humgen/teams/hgi/stashed/scratch101/foo/bar/quux"),
     _make_case("/lustre/scratch101/realdata/mdt0/.vault/.stashed/01/23/45/67/89/ab-Zm9vL2Jhci9xdXV4",
-               "hgi", "/humgen/teams/hgi/stashed/scratch101/foo/bar/quux")
+               "hgi", "/humgen/teams/hgi/stashed/scratch101/foo/bar/quux"),
+
+    # Long Vault Keys
+    _make_case("/lustre/scratch101/.vault/.staged/01/23/45/67/89/ab-bG9uZ19kaXJlY3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL2xvbmdfZGlyZWN0b3J5X25hbWUvbG9uZ19kaXJlY3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL2xvbmdfZGlyZWN0b3J5X25hbWUvbG9uZ19kaXJlY3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL2xvbmdfZGlyZWN0b3J5X25hbWUvbG9uZ19kaXJlY/3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL3ZlcnlfbG9uZ19maWxlbmFtZQ==",
+                "hgi", "/humgen/teams/hgi/scratch101/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/very_long_filename"),
+    _make_case("/lustre/scratch101/realdata/mdt0/.vault/.staged/01/23/45/67/89/ab-bG9uZ19kaXJlY3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL2xvbmdfZGlyZWN0b3J5X25hbWUvbG9uZ19kaXJlY3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL2xvbmdfZGlyZWN0b3J5X25hbWUvbG9uZ19kaXJlY3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL2xvbmdfZGlyZWN0b3J5X25hbWUvbG9uZ19kaXJlY/3RvcnlfbmFtZS9sb25nX2RpcmVjdG9yeV9uYW1lL3ZlcnlfbG9uZ19maWxlbmFtZQ==",
+                "hgi", "/humgen/teams/hgi/scratch101/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/long_directory_name/very_long_filename")
 ]
 
 _EXPECTED = (expected for _, _, expected in _CASES)
