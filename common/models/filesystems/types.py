@@ -44,7 +44,13 @@ class Data:
     filesystem:BaseFilesystem
     address:T.Path
 
-DataGenerator = T.Iterator[Data]
+class _DataGenMeta(type):
+    @classmethod
+    def __instancecheck__(cls, o):
+        return isinstance(o, iter) and all(isinstance(x, Data) for x in o)
+
+class DataGenerator(list, metaclass=_DataGenMeta):
+    pass
 
 
 class BaseFilesystem(T.Named, metaclass=ABCMeta):
