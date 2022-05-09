@@ -49,9 +49,16 @@ class _DataGenMeta(type):
     def __instancecheck__(cls, o):
         return isinstance(o, iter) and all(isinstance(x, Data) for x in o)
 
-class DataGenerator(list, metaclass=_DataGenMeta):
-    pass
-
+class DataGenerator(metaclass=_DataGenMeta):
+    """note, this type can be used to say something is T.Iterator[Data]
+    it is an absolute bodge to get singledispatch to recognise
+    T.Iterator[Data]
+    we could give this class full functionality, and make everything
+    that was an iterator of Data just use this class, then we don't 
+    even need the metaclass
+    
+    type checkers won't enjoy this
+    """
 
 class BaseFilesystem(T.Named, metaclass=ABCMeta):
     """
